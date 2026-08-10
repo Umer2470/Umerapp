@@ -2291,6 +2291,57 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportSalesReportPdf(
+        context: android.content.Context,
+        salesList: List<Sale> = allSales.value,
+        title: String = "SALES & FINANCIAL ACCOUNTING REPORT",
+        action: String = "open"
+    ) {
+        viewModelScope.launch {
+            val s = repository.getSettingsSync()
+            val allItems = allSaleItems.value
+            val expenses = allExpenses.value
+            val file = com.example.util.PdfGenerator.generateSalesReportPdf(context, salesList, allItems, expenses, s, title)
+            if (file != null) {
+                if (action == "whatsapp") {
+                    val msg = "📊 *Sales & Accounting PDF Report*\nStore: *${s.storeName}*\nTotal Transactions: ${salesList.size}\nTotal Net Sales: ${s.currencySymbol} ${salesList.sumOf { it.netAmount }.toInt()}\nPlease find attached PDF report."
+                    com.example.util.PdfGenerator.shareToWhatsApp(context, file, msg)
+                } else if (action == "print") {
+                    com.example.util.PdfGenerator.printPdf(context, file)
+                } else {
+                    com.example.util.PdfGenerator.openOrSharePdf(context, file, action)
+                }
+            } else {
+                showToast("Failed to generate Sales Report PDF")
+            }
+        }
+    }
+
+    fun exportInventoryReportPdf(
+        context: android.content.Context,
+        action: String = "open"
+    ) {
+        viewModelScope.launch {
+            val s = repository.getSettingsSync()
+            val products = allProducts.value
+            val file = com.example.util.PdfGenerator.generateInventoryReportPdf(context, products, s)
+            if (file != null) {
+                if (action == "whatsapp") {
+                    val totalUnits = products.sumOf { it.stockQuantity.toInt() }
+                    val totalVal = products.sumOf { it.stockQuantity * it.purchasePrice }.toInt()
+                    val msg = "📦 *Inventory Valuation PDF Report*\nStore: *${s.storeName}*\nTotal Catalog Items: ${products.size}\nTotal Physical Units: $totalUnits\nStock Cost Valuation: ${s.currencySymbol} $totalVal\nPlease find attached PDF report."
+                    com.example.util.PdfGenerator.shareToWhatsApp(context, file, msg)
+                } else if (action == "print") {
+                    com.example.util.PdfGenerator.printPdf(context, file)
+                } else {
+                    com.example.util.PdfGenerator.openOrSharePdf(context, file, action)
+                }
+            } else {
+                showToast("Failed to generate Inventory Report PDF")
+            }
+        }
+    }
+
     // --- DASHBOARD WIDGET REORDERING ---
     val defaultWidgetOrder = listOf(
         "QUICK_SALE",

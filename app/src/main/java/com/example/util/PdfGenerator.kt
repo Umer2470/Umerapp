@@ -12,12 +12,15 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
+import android.os.Environment
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.example.data.entity.Customer
 import com.example.data.entity.CustomerLedger
+import com.example.data.entity.Expense
+import com.example.data.entity.Product
 import com.example.data.entity.Sale
 import com.example.data.entity.SaleItem
 import com.example.data.entity.StoreSettings
@@ -1560,6 +1563,525 @@ object PdfGenerator {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    /**
+     * Generates a multi-page Sales & Financial Accounting PDF report and exports it to device storage.
+     */
+    fun generateSalesReportPdf(
+        context: Context,
+        sales: List<Sale>,
+        saleItems: List<SaleItem>,
+        expenses: List<Expense>,
+        settings: StoreSettings,
+        title: String = "SALES & FINANCIAL ACCOUNTING REPORT"
+    ): File? {
+        return try {
+            val pdfDocument = PdfDocument()
+            val pageWidth = 595
+            val pageHeight = 842
+            val margin = 35f
+
+            val paint = Paint().apply { isAntiAlias = true }
+
+            val primaryColor = Color.rgb(15, 23, 42)
+            val brandAccent = Color.rgb(37, 99, 235)
+            val textColorDark = Color.rgb(30, 41, 59)
+            val textColorMuted = Color.rgb(100, 116, 139)
+            val bgLightGray = Color.rgb(248, 250, 252)
+            val borderGray = Color.rgb(226, 232, 240)
+            val creditRed = Color.rgb(225, 29, 72)
+            val debitGreen = Color.rgb(16, 185, 129)
+
+            val dateFormat = SimpleDateFormat("dd/MM/yy hh:mm a", Locale.getDefault())
+            val dateOnlyFormat = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+
+            val totalTransactions = sales.size
+            val grossRevenue = sales.sumOf { it.totalAmount }
+            val totalDiscounts = sales.sumOf { it.discount }
+            val netRevenue = sales.sumOf { it.netAmount }
+            val totalPaid = sales.sumOf { it.paidAmount }
+            val totalDue = sales.sumOf { it.dueAmount }
+
+            val saleIds = sales.map { it.id }.toSet()
+            val filteredSaleItems = saleItems.filter { it.saleId in saleIds }
+            val totalCogs = filteredSaleItems.sumOf { it.quantity * it.purchasePrice }
+            val grossSalesProfit = filteredSaleItems.sumOf { it.totalPrice - (it.quantity * it.purchasePrice) } - totalDiscounts
+            val totalExpenses = expenses.sumOf { it.amount }
+            val netOperatingProfit = grossSalesProfit - totalExpenses
+
+            val cashTotal = sales.filter { it.paymentType.contains("Cash", ignoreCase = true) }.sumOf { it.netAmount }
+            val udhaarTotal = sales.filter { it.paymentType.contains("Udhaar", ignoreCase = true) || it.paymentType.contains("Credit", ignoreCase = true) || it.dueAmount > 0 }.sumOf { it.netAmount }
+
+            var pageNum = 1
+            var pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNum).create()
+            var page = pdfDocument.startPage(pageInfo)
+            var canvas: Canvas = page.canvas
+
+            var currentY = 40f
+
+            fun drawHeader() {
+                paint.color = brandAccent
+                canvas.drawRect(0f, 0f, pageWidth.toFloat(), 12f, paint)
+
+                currentY = 30f
+                paint.apply {
+                    color = primaryColor
+                    textSize = 20f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    textAlign = Paint.Align.CENTER
+                }
+                canvas.drawText(settings.storeName, pageWidth / 2f, currentY, paint)
+
+                currentY += 15f
+                paint.apply {
+                    color = textColorMuted
+                    textSize = 9f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                }
+                canvas.drawText("Proprietor: ${settings.ownerName}  |  Phone: ${settings.phone}", pageWidth / 2f, currentY, paint)
+
+                currentY += 12f
+                canvas.drawText("Address: ${settings.address}", pageWidth / 2f, currentY, paint)
+
+                currentY += 12f
+                paint.color = borderGray
+                paint.strokeWidth = 1f
+                canvas.drawLine(margin, currentY, pageWidth - margin, currentY, paint)
+
+                currentY += 20f
+                paint.color = bgLightGray
+                canvas.drawRoundRect(margin, currentY - 12f, pageWidth - margin, currentY + 24f, 6f, 6f, paint)
+
+                paint.apply {
+                    color = primaryColor
+                    textSize = 12f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    textAlign = Paint.Align.LEFT
+                }
+                canvas.drawText(title, margin + 12f, currentY + 6f, paint)
+
+                paint.apply {
+                    color = textColorMuted
+                    textSize = 9f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    textAlign = Paint.Align.RIGHT
+                }
+                canvas.drawText("Generated: ${dateOnlyFormat.format(Date())}", pageWidth - margin - 12f, currentY + 6f, paint)
+
+                currentY += 35f
+            }
+
+            drawHeader()
+
+            // Executive Financial KPI Summary Box
+            paint.color = bgLightGray
+            canvas.drawRoundRect(margin, currentY, pageWidth - margin, currentY + 115f, 8f, 8f, paint)
+
+            paint.apply {
+                color = primaryColor
+                textSize = 11f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.LEFT
+            }
+            canvas.drawText("EXECUTIVE FINANCIAL SUMMARY", margin + 12f, currentY + 18f, paint)
+
+            paint.apply {
+                color = textColorDark
+                textSize = 9f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            }
+
+            // Left Column
+            val col1X = margin + 12f
+            canvas.drawText("Total Transactions: $totalTransactions Sales", col1X, currentY + 36f, paint)
+            canvas.drawText("Gross Sales Value: ${settings.currencySymbol} ${grossRevenue.toInt()}", col1X, currentY + 52f, paint)
+            canvas.drawText("Discounts Allowed: - ${settings.currencySymbol} ${totalDiscounts.toInt()}", col1X, currentY + 68f, paint)
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            canvas.drawText("Net Revenue: ${settings.currencySymbol} ${netRevenue.toInt()}", col1X, currentY + 84f, paint)
+
+            // Middle Column
+            val col2X = margin + 200f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            canvas.drawText("Cost of Goods (COGS): ${settings.currencySymbol} ${totalCogs.toInt()}", col2X, currentY + 36f, paint)
+            canvas.drawText("Gross Sales Profit: ${settings.currencySymbol} ${grossSalesProfit.toInt()}", col2X, currentY + 52f, paint)
+            canvas.drawText("Operating Expenses: - ${settings.currencySymbol} ${totalExpenses.toInt()}", col2X, currentY + 68f, paint)
+            paint.apply {
+                color = if (netOperatingProfit >= 0) debitGreen else creditRed
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            canvas.drawText("Net Operating Profit: ${settings.currencySymbol} ${netOperatingProfit.toInt()}", col2X, currentY + 84f, paint)
+
+            // Right Column
+            val col3X = margin + 380f
+            paint.apply {
+                color = textColorDark
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            }
+            canvas.drawText("Cash Sales: ${settings.currencySymbol} ${cashTotal.toInt()}", col3X, currentY + 36f, paint)
+            canvas.drawText("Udhaar Credit Sales: ${settings.currencySymbol} ${udhaarTotal.toInt()}", col3X, currentY + 52f, paint)
+            canvas.drawText("Total Amount Paid: ${settings.currencySymbol} ${totalPaid.toInt()}", col3X, currentY + 68f, paint)
+            paint.apply {
+                color = creditRed
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            canvas.drawText("Outstanding Due: ${settings.currencySymbol} ${totalDue.toInt()}", col3X, currentY + 84f, paint)
+
+            currentY += 130f
+
+            fun drawTableHeader() {
+                paint.color = primaryColor
+                canvas.drawRoundRect(margin, currentY, pageWidth - margin, currentY + 22f, 4f, 4f, paint)
+
+                paint.apply {
+                    color = Color.WHITE
+                    textSize = 9f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                }
+                paint.textAlign = Paint.Align.LEFT
+                canvas.drawText("Date & Time", margin + 8f, currentY + 15f, paint)
+                canvas.drawText("Invoice #", margin + 110f, currentY + 15f, paint)
+                canvas.drawText("Customer Name", margin + 180f, currentY + 15f, paint)
+                canvas.drawText("Pay Mode", margin + 310f, currentY + 15f, paint)
+
+                paint.textAlign = Paint.Align.RIGHT
+                canvas.drawText("Net Amt", margin + 410f, currentY + 15f, paint)
+                canvas.drawText("Paid", margin + 470f, currentY + 15f, paint)
+                canvas.drawText("Due", pageWidth - margin - 8f, currentY + 15f, paint)
+
+                currentY += 26f
+            }
+
+            drawTableHeader()
+
+            paint.apply {
+                textSize = 8.5f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            }
+
+            for (sale in sales) {
+                if (currentY > pageHeight - 60f) {
+                    paint.apply {
+                        color = textColorMuted
+                        textSize = 8f
+                        textAlign = Paint.Align.CENTER
+                    }
+                    canvas.drawText("Page $pageNum • Generated by ${settings.storeName}", pageWidth / 2f, pageHeight - 25f, paint)
+
+                    pdfDocument.finishPage(page)
+
+                    pageNum++
+                    pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNum).create()
+                    page = pdfDocument.startPage(pageInfo)
+                    canvas = page.canvas
+
+                    currentY = 40f
+                    drawHeader()
+                    drawTableHeader()
+                    paint.apply {
+                        textSize = 8.5f
+                        typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                    }
+                }
+
+                paint.color = textColorDark
+                paint.textAlign = Paint.Align.LEFT
+                canvas.drawText(dateFormat.format(Date(sale.timestamp)), margin + 8f, currentY, paint)
+                canvas.drawText(sale.invoiceNumber, margin + 110f, currentY, paint)
+
+                val custName = if (sale.customerName.length > 20) sale.customerName.take(18) + ".." else sale.customerName
+                canvas.drawText(custName, margin + 180f, currentY, paint)
+                canvas.drawText(sale.paymentType, margin + 310f, currentY, paint)
+
+                paint.textAlign = Paint.Align.RIGHT
+                canvas.drawText("${settings.currencySymbol}${sale.netAmount.toInt()}", margin + 410f, currentY, paint)
+                canvas.drawText("${settings.currencySymbol}${sale.paidAmount.toInt()}", margin + 470f, currentY, paint)
+
+                paint.color = if (sale.dueAmount > 0) creditRed else textColorDark
+                canvas.drawText("${settings.currencySymbol}${sale.dueAmount.toInt()}", pageWidth - margin - 8f, currentY, paint)
+
+                currentY += 16f
+                paint.color = borderGray
+                paint.strokeWidth = 0.5f
+                canvas.drawLine(margin, currentY - 10f, pageWidth - margin, currentY - 10f, paint)
+            }
+
+            paint.apply {
+                color = textColorMuted
+                textSize = 8f
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText("Page $pageNum • Confidential External Accounting Document", pageWidth / 2f, pageHeight - 25f, paint)
+
+            pdfDocument.finishPage(page)
+
+            saveAndExportPdfFile(context, pdfDocument, "SalesReport_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.pdf")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    /**
+     * Generates a multi-page Inventory & Stock Valuation PDF report and exports it to device storage.
+     */
+    fun generateInventoryReportPdf(
+        context: Context,
+        products: List<Product>,
+        settings: StoreSettings
+    ): File? {
+        return try {
+            val pdfDocument = PdfDocument()
+            val pageWidth = 595
+            val pageHeight = 842
+            val margin = 35f
+
+            val paint = Paint().apply { isAntiAlias = true }
+
+            val primaryColor = Color.rgb(15, 23, 42)
+            val brandAccent = Color.rgb(37, 99, 235)
+            val textColorDark = Color.rgb(30, 41, 59)
+            val textColorMuted = Color.rgb(100, 116, 139)
+            val bgLightGray = Color.rgb(248, 250, 252)
+            val borderGray = Color.rgb(226, 232, 240)
+            val creditRed = Color.rgb(225, 29, 72)
+            val debitGreen = Color.rgb(16, 185, 129)
+
+            val dateOnlyFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+
+            val totalProducts = products.size
+            val totalUnits = products.sumOf { it.stockQuantity }.toInt()
+            val totalCostValuation = products.sumOf { it.stockQuantity * it.purchasePrice }
+            val totalRetailValuation = products.sumOf { it.stockQuantity * it.salePrice }
+            val projectedProfit = totalRetailValuation - totalCostValuation
+            val lowStockCount = products.count { it.stockQuantity in 1.0..it.minStockLevel }
+            val outOfStockCount = products.count { it.stockQuantity <= 0 }
+
+            var pageNum = 1
+            var pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNum).create()
+            var page = pdfDocument.startPage(pageInfo)
+            var canvas: Canvas = page.canvas
+
+            var currentY = 40f
+
+            fun drawHeader() {
+                paint.color = brandAccent
+                canvas.drawRect(0f, 0f, pageWidth.toFloat(), 12f, paint)
+
+                currentY = 30f
+                paint.apply {
+                    color = primaryColor
+                    textSize = 20f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    textAlign = Paint.Align.CENTER
+                }
+                canvas.drawText(settings.storeName, pageWidth / 2f, currentY, paint)
+
+                currentY += 15f
+                paint.apply {
+                    color = textColorMuted
+                    textSize = 9f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                }
+                canvas.drawText("Proprietor: ${settings.ownerName}  |  Phone: ${settings.phone}", pageWidth / 2f, currentY, paint)
+
+                currentY += 12f
+                canvas.drawText("Address: ${settings.address}", pageWidth / 2f, currentY, paint)
+
+                currentY += 12f
+                paint.color = borderGray
+                paint.strokeWidth = 1f
+                canvas.drawLine(margin, currentY, pageWidth - margin, currentY, paint)
+
+                currentY += 20f
+                paint.color = bgLightGray
+                canvas.drawRoundRect(margin, currentY - 12f, pageWidth - margin, currentY + 24f, 6f, 6f, paint)
+
+                paint.apply {
+                    color = primaryColor
+                    textSize = 12f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    textAlign = Paint.Align.LEFT
+                }
+                canvas.drawText("INVENTORY & STOCK VALUATION REPORT", margin + 12f, currentY + 6f, paint)
+
+                paint.apply {
+                    color = textColorMuted
+                    textSize = 9f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    textAlign = Paint.Align.RIGHT
+                }
+                canvas.drawText("As of: ${dateOnlyFormat.format(Date())}", pageWidth - margin - 12f, currentY + 6f, paint)
+
+                currentY += 35f
+            }
+
+            drawHeader()
+
+            // Executive Inventory Valuation KPI Box
+            paint.color = bgLightGray
+            canvas.drawRoundRect(margin, currentY, pageWidth - margin, currentY + 100f, 8f, 8f, paint)
+
+            paint.apply {
+                color = primaryColor
+                textSize = 11f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.LEFT
+            }
+            canvas.drawText("EXECUTIVE INVENTORY VALUATION SUMMARY", margin + 12f, currentY + 18f, paint)
+
+            paint.apply {
+                color = textColorDark
+                textSize = 9f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            }
+
+            val col1X = margin + 12f
+            canvas.drawText("Total Catalog Items: $totalProducts Products", col1X, currentY + 36f, paint)
+            canvas.drawText("Total Physical Units: $totalUnits Units", col1X, currentY + 54f, paint)
+            canvas.drawText("Low Stock Items: $lowStockCount | Out of Stock: $outOfStockCount", col1X, currentY + 72f, paint)
+
+            val col2X = margin + 260f
+            canvas.drawText("Total Cost Value (COGS): ${settings.currencySymbol} ${totalCostValuation.toInt()}", col2X, currentY + 36f, paint)
+            canvas.drawText("Total Retail Sales Value: ${settings.currencySymbol} ${totalRetailValuation.toInt()}", col2X, currentY + 54f, paint)
+            paint.apply {
+                color = debitGreen
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            canvas.drawText("Projected Inventory Margin: +${settings.currencySymbol} ${projectedProfit.toInt()}", col2X, currentY + 72f, paint)
+
+            currentY += 115f
+
+            fun drawTableHeader() {
+                paint.color = primaryColor
+                canvas.drawRoundRect(margin, currentY, pageWidth - margin, currentY + 22f, 4f, 4f, paint)
+
+                paint.apply {
+                    color = Color.WHITE
+                    textSize = 9f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                }
+                paint.textAlign = Paint.Align.LEFT
+                canvas.drawText("Product Name / Code", margin + 8f, currentY + 15f, paint)
+                canvas.drawText("Category", margin + 190f, currentY + 15f, paint)
+
+                paint.textAlign = Paint.Align.RIGHT
+                canvas.drawText("Stock Qty", margin + 290f, currentY + 15f, paint)
+                canvas.drawText("Cost Price", margin + 370f, currentY + 15f, paint)
+                canvas.drawText("Sale Price", margin + 450f, currentY + 15f, paint)
+                canvas.drawText("Total Cost Val", pageWidth - margin - 8f, currentY + 15f, paint)
+
+                currentY += 26f
+            }
+
+            drawTableHeader()
+
+            paint.apply {
+                textSize = 8.5f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            }
+
+            for (p in products) {
+                if (currentY > pageHeight - 60f) {
+                    paint.apply {
+                        color = textColorMuted
+                        textSize = 8f
+                        textAlign = Paint.Align.CENTER
+                    }
+                    canvas.drawText("Page $pageNum • Generated by ${settings.storeName}", pageWidth / 2f, pageHeight - 25f, paint)
+
+                    pdfDocument.finishPage(page)
+
+                    pageNum++
+                    pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNum).create()
+                    page = pdfDocument.startPage(pageInfo)
+                    canvas = page.canvas
+
+                    currentY = 40f
+                    drawHeader()
+                    drawTableHeader()
+                    paint.apply {
+                        textSize = 8.5f
+                        typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                    }
+                }
+
+                paint.color = textColorDark
+                paint.textAlign = Paint.Align.LEFT
+                val pName = if (p.name.length > 25) p.name.take(23) + ".." else p.name
+                canvas.drawText(pName, margin + 8f, currentY, paint)
+
+                val catStr = if (p.category.length > 15) p.category.take(13) + ".." else p.category
+                canvas.drawText(catStr, margin + 190f, currentY, paint)
+
+                paint.textAlign = Paint.Align.RIGHT
+                val qtyColor = when {
+                    p.stockQuantity <= 0 -> creditRed
+                    p.stockQuantity <= p.minStockLevel -> Color.rgb(217, 119, 6)
+                    else -> textColorDark
+                }
+                paint.color = qtyColor
+                canvas.drawText("${p.stockQuantity.toInt()} ${p.unit}", margin + 290f, currentY, paint)
+
+                paint.color = textColorDark
+                canvas.drawText("${settings.currencySymbol}${p.purchasePrice.toInt()}", margin + 370f, currentY, paint)
+                canvas.drawText("${settings.currencySymbol}${p.salePrice.toInt()}", margin + 450f, currentY, paint)
+
+                val itemTotalCost = p.stockQuantity * p.purchasePrice
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                canvas.drawText("${settings.currencySymbol}${itemTotalCost.toInt()}", pageWidth - margin - 8f, currentY, paint)
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+
+                currentY += 16f
+                paint.color = borderGray
+                paint.strokeWidth = 0.5f
+                canvas.drawLine(margin, currentY - 10f, pageWidth - margin, currentY - 10f, paint)
+            }
+
+            paint.apply {
+                color = textColorMuted
+                textSize = 8f
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText("Page $pageNum • Official Inventory Valuation Record", pageWidth / 2f, pageHeight - 25f, paint)
+
+            pdfDocument.finishPage(page)
+
+            saveAndExportPdfFile(context, pdfDocument, "InventoryReport_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.pdf")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    private fun saveAndExportPdfFile(context: Context, pdfDocument: PdfDocument, filename: String): File? {
+        return try {
+            val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "reports").apply { if (!exists()) mkdirs() }
+            val pdfFile = File(dir, filename)
+            val outputStream = FileOutputStream(pdfFile)
+            pdfDocument.writeTo(outputStream)
+            outputStream.close()
+            pdfDocument.close()
+
+            try {
+                val publicDownloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (publicDownloadsDir != null && (publicDownloadsDir.exists() || publicDownloadsDir.mkdirs())) {
+                    val publicFile = File(publicDownloadsDir, filename)
+                    pdfFile.copyTo(publicFile, overwrite = true)
+                    Toast.makeText(context, "Exported PDF saved to Downloads/$filename", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(context, "Exported PDF saved to ${pdfFile.name}", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Exported PDF saved to ${pdfFile.name}", Toast.LENGTH_LONG).show()
+            }
+
+            pdfFile
+        } catch (e: Exception) {
+            e.printStackTrace()
+            pdfDocument.close()
+            null
         }
     }
 }

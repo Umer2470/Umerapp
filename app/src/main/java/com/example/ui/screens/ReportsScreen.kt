@@ -31,8 +31,11 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.MoneyOff
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PointOfSale
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.TrendingUp
@@ -252,6 +255,66 @@ fun ReportsScreen(viewModel: StoreViewModel) {
                                     selectedDate = newCal
                                 }) {
                                     Icon(Icons.Default.ChevronRight, contentDescription = "Next Day")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Export Daily Sales PDF Card
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.PictureAsPdf,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        "Export Daily Sales PDF",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "Save accounting report to device storage",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Row {
+                                IconButton(onClick = {
+                                    val titleStr = "DAILY SALES REPORT - ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(calSelectedStart.time)}"
+                                    viewModel.exportSalesReportPdf(context, dailySales, titleStr, action = "open")
+                                }) {
+                                    Icon(Icons.Default.PictureAsPdf, contentDescription = "Export PDF", tint = MaterialTheme.colorScheme.primary)
+                                }
+                                IconButton(onClick = {
+                                    val titleStr = "DAILY SALES REPORT - ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(calSelectedStart.time)}"
+                                    viewModel.exportSalesReportPdf(context, dailySales, titleStr, action = "whatsapp")
+                                }) {
+                                    Icon(Icons.Default.Share, contentDescription = "Share Report", tint = MaterialTheme.colorScheme.primary)
+                                }
+                                IconButton(onClick = {
+                                    val titleStr = "DAILY SALES REPORT - ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(calSelectedStart.time)}"
+                                    viewModel.exportSalesReportPdf(context, dailySales, titleStr, action = "print")
+                                }) {
+                                    Icon(Icons.Default.Print, contentDescription = "Print Report", tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -512,6 +575,62 @@ fun ReportsScreen(viewModel: StoreViewModel) {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
                     Text("Monthly Store Performance", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.PictureAsPdf,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        "Export Complete Accounting PDF",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "Save all-time sales & P&L report to storage",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Row {
+                                IconButton(onClick = {
+                                    viewModel.exportSalesReportPdf(context, title = "COMPLETE FINANCIAL ACCOUNTING REPORT", action = "open")
+                                }) {
+                                    Icon(Icons.Default.PictureAsPdf, contentDescription = "Export PDF", tint = MaterialTheme.colorScheme.primary)
+                                }
+                                IconButton(onClick = {
+                                    viewModel.exportSalesReportPdf(context, title = "COMPLETE FINANCIAL ACCOUNTING REPORT", action = "whatsapp")
+                                }) {
+                                    Icon(Icons.Default.Share, contentDescription = "Share Report", tint = MaterialTheme.colorScheme.primary)
+                                }
+                                IconButton(onClick = {
+                                    viewModel.exportSalesReportPdf(context, title = "COMPLETE FINANCIAL ACCOUNTING REPORT", action = "print")
+                                }) {
+                                    Icon(Icons.Default.Print, contentDescription = "Print Report", tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 item {

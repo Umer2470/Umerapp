@@ -26,9 +26,11 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -86,6 +88,7 @@ val UNITS = listOf("Pcs", "Ft", "Meter", "Bag", "Box", "Set", "Roll", "Coil", "L
 
 @Composable
 fun InventoryScreen(viewModel: StoreViewModel) {
+    val context = LocalContext.current
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val allProducts by viewModel.allProducts.collectAsState()
@@ -204,6 +207,22 @@ fun InventoryScreen(viewModel: StoreViewModel) {
                         imageVector = Icons.Default.Inventory2,
                         contentDescription = "Batch Import Shipment",
                         tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                IconButton(
+                    onClick = { viewModel.exportInventoryReportPdf(context) },
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.tertiaryContainer)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PictureAsPdf,
+                        contentDescription = "Export Inventory PDF Report",
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                 }
             }
