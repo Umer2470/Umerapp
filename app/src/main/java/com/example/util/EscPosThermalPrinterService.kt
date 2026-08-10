@@ -228,6 +228,21 @@ object EscPosThermalPrinterService {
     }
 
     /**
+     * Retrieves list of paired Bluetooth devices (Name, Address)
+     */
+    @SuppressLint("MissingPermission")
+    fun getPairedDevices(context: Context): List<Pair<String, String>> {
+        val btAdapter = BluetoothAdapter.getDefaultAdapter() ?: return emptyList()
+        if (!btAdapter.isEnabled) return emptyList()
+        val bonded = btAdapter.bondedDevices ?: return emptyList()
+        return bonded.map { device ->
+            val name = device.name ?: "Unknown Device"
+            val address = device.address ?: ""
+            Pair(name, address)
+        }
+    }
+
+    /**
      * Prints directly to paired Bluetooth Thermal Printer
      */
     @SuppressLint("MissingPermission")

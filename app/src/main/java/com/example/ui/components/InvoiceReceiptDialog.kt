@@ -81,6 +81,7 @@ fun InvoiceReceiptDialog(
     val formattedDate = dateFormatter.format(Date(sale.timestamp))
 
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showPrintPreviewDialog by remember { mutableStateOf(false) }
 
     // 0: 58mm Thermal, 1: 80mm Thermal, 2: A4 Standard Invoice
     var selectedFormatIndex by remember { mutableIntStateOf(0) }
@@ -469,6 +470,20 @@ fun InvoiceReceiptDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Print Preview & Bluetooth Thermal Printer Primary Button
+                Button(
+                    onClick = { showPrintPreviewDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = BentoPrimary),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("PDF Print Preview & Bluetooth Printer", fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 // ESC/POS Direct Thermal Print Row
                 OutlinedButton(
                     onClick = {
@@ -491,7 +506,7 @@ fun InvoiceReceiptDialog(
                 ) {
                     Icon(imageVector = Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp), tint = BentoPrimary)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("ESC/POS Thermal Direct Print (BT/USB)", color = BentoPrimary, fontWeight = FontWeight.Bold)
+                    Text("ESC/POS Direct Print (BT/USB)", color = BentoPrimary, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -570,6 +585,17 @@ fun InvoiceReceiptDialog(
             }
         }
     )
+
+    // Print Preview Dialog
+    if (showPrintPreviewDialog) {
+        PrintPreviewDialog(
+            sale = sale,
+            items = items,
+            settings = settings,
+            initialFormat = currentFormat,
+            onDismiss = { showPrintPreviewDialog = false }
+        )
+    }
 
     // Delete Confirmation Dialog
     if (showDeleteConfirmation) {
