@@ -54,7 +54,7 @@ import com.example.data.entity.AttendanceRecord
         SuperAdminRecovery::class,
         AttendanceRecord::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class StoreDatabase : RoomDatabase() {

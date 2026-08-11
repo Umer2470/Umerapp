@@ -113,6 +113,20 @@ object PdfGenerator {
 
     private fun drawQrCodeOnCanvas(canvas: Canvas, payload: String, x: Float, y: Float, size: Float) {
         try {
+            val pxSize = size.toInt().coerceAtLeast(120)
+            val writer = com.google.zxing.qrcode.QRCodeWriter()
+            val bitMatrix = writer.encode(payload, com.google.zxing.BarcodeFormat.QR_CODE, pxSize, pxSize)
+            val w = bitMatrix.width
+            val h = bitMatrix.height
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            for (cx in 0 until w) {
+                for (cy in 0 until h) {
+                    bitmap.setPixel(cx, cy, if (bitMatrix.get(cx, cy)) Color.BLACK else Color.WHITE)
+                }
+            }
+            canvas.drawBitmap(bitmap, null, RectF(x, y, x + size, y + size), null)
+        } catch (e: Exception) {
+            e.printStackTrace()
             val matrix = QrCodeRenderer.generateQrMatrix(payload)
             val gridSize = matrix.size
             val cellSize = size / gridSize
@@ -141,8 +155,6 @@ object PdfGenerator {
                     }
                 }
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
     }
 
@@ -389,10 +401,32 @@ object PdfGenerator {
             }
 
             // Draw QR Code and Barcode on Left Side
-            val qrSize = 65f
+            val qrSize = 70f
             val qrX = boxLeft + 10f
             val qrY = currentY + 5f
-            drawQrCodeOnCanvas(canvas, invoice.meta.invoiceId, qrX, qrY, qrSize)
+            val qrPayload = InvoiceFormattingService.getQrCodePayload(
+                storeName = invoice.header.storeName,
+                invoiceNumber = invoice.meta.invoiceId,
+                formattedDate = invoice.meta.formattedDate,
+                customerName = invoice.customer.name,
+                totalAmount = invoice.totals.netAmount,
+                currencySymbol = invoice.header.currencySymbol,
+                paidAmount = invoice.totals.paidAmount,
+                dueAmount = invoice.totals.dueAmount,
+                paymentType = invoice.meta.paymentType,
+                timestamp = invoice.meta.timestamp
+            )
+            drawQrCodeOnCanvas(canvas, qrPayload, qrX, qrY, qrSize)
+
+            val verId = InvoiceFormattingService.getInvoiceVerificationId(invoice.meta.invoiceId, invoice.meta.timestamp)
+            paint.apply {
+                color = textColorMuted
+                textSize = 7f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.LEFT
+            }
+            canvas.drawText("VERIFICATION ID:", qrX, qrY + qrSize + 10f, paint)
+            canvas.drawText(verId, qrX, qrY + qrSize + 19f, paint)
 
             val barcodeX = qrX + qrSize + 20f
             val barcodeY = currentY + 15f
@@ -621,10 +655,33 @@ object PdfGenerator {
             drawDashedLine()
 
             // QR Code & Barcode on Receipt
-            val thermalQrSize = 55f
+            val thermalQrSize = 60f
             val thermalQrX = center - (thermalQrSize / 2f)
-            drawQrCodeOnCanvas(canvas, invoice.meta.invoiceId, thermalQrX, currentY, thermalQrSize)
-            currentY += thermalQrSize + 8f
+            val thermalQrPayload = InvoiceFormattingService.getQrCodePayload(
+                storeName = invoice.header.storeName,
+                invoiceNumber = invoice.meta.invoiceId,
+                formattedDate = invoice.meta.formattedDate,
+                customerName = invoice.customer.name,
+                totalAmount = invoice.totals.netAmount,
+                currencySymbol = invoice.header.currencySymbol,
+                paidAmount = invoice.totals.paidAmount,
+                dueAmount = invoice.totals.dueAmount,
+                paymentType = invoice.meta.paymentType,
+                timestamp = invoice.meta.timestamp
+            )
+            drawQrCodeOnCanvas(canvas, thermalQrPayload, thermalQrX, currentY, thermalQrSize)
+            currentY += thermalQrSize + 6f
+
+            val verId = InvoiceFormattingService.getInvoiceVerificationId(invoice.meta.invoiceId, invoice.meta.timestamp)
+            paint.apply {
+                textSize = 7.5f
+                typeface = thermalTypeface
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText("SCAN QR TO VERIFY INVOICE", center, currentY, paint)
+            currentY += 10f
+            canvas.drawText("VER ID: $verId", center, currentY, paint)
+            currentY += 12f
 
             val thermalBarcodeW = pageWidth - 40f
             val thermalBarcodeH = 25f

@@ -91,6 +91,72 @@ object InvoiceFormattingService {
         val termsAndConditions: String = "Goods once sold can be exchanged within 7 days with valid original bill. Mixed paints and custom cut materials are non-returnable."
     )
 
+    // --- QR VERIFICATION HELPERS ---
+
+    fun getInvoiceVerificationId(invoiceId: String, timestamp: Long): String {
+        val cleanInv = invoiceId.replace("[^A-Za-z0-9]".toRegex(), "").uppercase(Locale.US)
+        val hashStr = String.format(Locale.US, "%05d", kotlin.math.abs(timestamp % 100000))
+        return "VER-$cleanInv-$hashStr"
+    }
+
+    fun getPaymentStatusString(paidAmount: Double, dueAmount: Double, paymentType: String, currencySymbol: String): String {
+        return when {
+            dueAmount <= 0 -> "Paid ($paymentType)"
+            paidAmount <= 0 -> "Unpaid / Udhaar ($currencySymbol ${dueAmount.toInt()})"
+            else -> "Partial ($currencySymbol ${paidAmount.toInt()}) / Due: $currencySymbol ${dueAmount.toInt()}"
+        }
+    }
+
+    fun getQrCodePayload(
+        storeName: String,
+        invoiceNumber: String,
+        formattedDate: String,
+        customerName: String,
+        totalAmount: Double,
+        currencySymbol: String,
+        paidAmount: Double,
+        dueAmount: Double,
+        paymentType: String,
+        timestamp: Long
+    ): String {
+        val verId = getInvoiceVerificationId(invoiceNumber, timestamp)
+        val payStatus = getPaymentStatusString(paidAmount, dueAmount, paymentType, currencySymbol)
+        return """
+=== CH UMAIR SENTRY STORE INVOICE VERIFICATION ===
+Store Name: $storeName
+Invoice Number: $invoiceNumber
+Invoice Date & Time: $formattedDate
+Customer Name: $customerName
+Total Amount: $currencySymbol ${totalAmount.toInt()}
+Payment Status: $payStatus
+Invoice Verification ID: $verId
+Status: VERIFIED AUTHENTIC OFFICIAL INVOICE
+""".trimIndent()
+    }
+
+    fun PrintableInvoiceStructure.getInvoiceVerificationId(): String {
+        return InvoiceFormattingService.getInvoiceVerificationId(meta.invoiceId, meta.timestamp)
+    }
+
+    fun PrintableInvoiceStructure.getPaymentStatusString(): String {
+        return InvoiceFormattingService.getPaymentStatusString(totals.paidAmount, totals.dueAmount, meta.paymentType, header.currencySymbol)
+    }
+
+    fun PrintableInvoiceStructure.getQrCodePayload(): String {
+        return InvoiceFormattingService.getQrCodePayload(
+            storeName = header.storeName,
+            invoiceNumber = meta.invoiceId,
+            formattedDate = meta.formattedDate,
+            customerName = customer.name,
+            totalAmount = totals.netAmount,
+            currencySymbol = header.currencySymbol,
+            paidAmount = totals.paidAmount,
+            dueAmount = totals.dueAmount,
+            paymentType = meta.paymentType,
+            timestamp = meta.timestamp
+        )
+    }
+
     // --- INVOICE ID GENERATOR ---
 
     /**

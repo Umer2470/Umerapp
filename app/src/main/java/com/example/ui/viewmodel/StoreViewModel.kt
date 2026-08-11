@@ -1362,6 +1362,10 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updatePinCode(newPin: String) {
         viewModelScope.launch {
+            if (!isSuperAdmin()) {
+                showToast("Permission Denied: Only Super Admin can change PIN/Password credentials.")
+                return@launch
+            }
             val s = repository.getSettingsSync()
             repository.saveSettings(s.copy(pinCode = newPin, isPinEnabled = true))
             logActivity("UPDATE_PIN", "Master PIN Code was updated")
@@ -1371,6 +1375,10 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun togglePinSecurity(enabled: Boolean) {
         viewModelScope.launch {
+            if (!isSuperAdmin()) {
+                showToast("Permission Denied: Only Super Admin can change PIN security settings.")
+                return@launch
+            }
             val s = repository.getSettingsSync()
             repository.saveSettings(s.copy(isPinEnabled = enabled))
             showToast(if (enabled) "PIN Lock Enabled" else "PIN Lock Disabled")
@@ -1626,8 +1634,12 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
     // --- USER MANAGEMENT (SUPER ADMIN) ---
     fun saveUser(user: UserAccount, adminPin: String, onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch {
+            if (!isSuperAdmin()) {
+                onComplete(false, "Permission Denied: Only Super Admin can manage user accounts and PINs!")
+                return@launch
+            }
             if (!verifyAdminPin(adminPin)) {
-                onComplete(false, "Invalid Admin/Super Admin PIN Code!")
+                onComplete(false, "Invalid Super Admin PIN Code!")
                 return@launch
             }
             val id = repository.saveUser(user)
@@ -1638,12 +1650,16 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteUser(user: UserAccount, adminPin: String, onComplete: (Boolean, String) -> Unit) {
         viewModelScope.launch {
+            if (!isSuperAdmin()) {
+                onComplete(false, "Permission Denied: Only Super Admin can delete user accounts!")
+                return@launch
+            }
             if (user.role == "SUPER_ADMIN") {
                 onComplete(false, "Cannot delete Super Admin account!")
                 return@launch
             }
             if (!verifyAdminPin(adminPin)) {
-                onComplete(false, "Invalid Admin/Super Admin PIN Code!")
+                onComplete(false, "Invalid Super Admin PIN Code!")
                 return@launch
             }
             repository.deleteUser(user)
@@ -2778,13 +2794,17 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- ATTENDANCE MANAGEMENT ---
+    // --- ATTENDANCE MANAGEMENT & PAYROLL ---
     val allAttendanceRecords: StateFlow<List<AttendanceRecord>> = repository.allAttendanceRecords
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private fun getTodayDateString(): String {
+        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+    }
+
     fun checkInEmployee(userId: Long, userName: String, userRole: String, notes: String = "") {
         viewModelScope.launch {
-            val dateStr = SimpleDateFormat("yyyy-MM-DD", Locale.getDefault()).format(Date())
+            val dateStr = getTodayDateString()
             val existing = repository.getAttendanceForUserAndDate(userId, dateStr)
             val storeId = selectedStoreId.value.let { if (it == 0L) 1L else it }
             val now = System.currentTimeMillis()
@@ -2816,24 +2836,54 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun checkOutEmployee(userId: Long, notes: String = "") {
         viewModelScope.launch {
-            val dateStr = SimpleDateFormat("yyyy-MM-DD", Locale.getDefault()).format(Date())
+            val dateStr = getTodayDateString()
             val existing = repository.getAttendanceForUserAndDate(userId, dateStr)
             val now = System.currentTimeMillis()
 
             if (existing != null && existing.checkInTime != null) {
-                val workedMs = now - existing.checkInTime
+                val totalElapsedMs = now - existing.checkInTime
+                val breakMs = if (existing.breakStartTime != null && existing.breakEndTime != null && existing.breakEndTime > existing.breakStartTime) {
+                    existing.breakEndTime - existing.breakStartTime
+                } else 0L
+
+                val workedMs = (totalElapsedMs - breakMs).coerceAtLeast(0L)
                 val workedMins = workedMs / (1000 * 60)
                 val overtimeMins = if (workedMins > 480) workedMins - 480 else 0L
+
+                // Calculate gross pay based on employee rates
+                val targetUser = allUsers.value.find { it.id == userId }
+                val hourlyRate = targetUser?.hourlyWageRate ?: 0.0
+                val dailyRate = targetUser?.dailyWageRate ?: 0.0
+                val overtimeRate = if ((targetUser?.overtimeHourlyRate ?: 0.0) > 0) {
+                    targetUser!!.overtimeHourlyRate
+                } else if (hourlyRate > 0) {
+                    hourlyRate * 1.5
+                } else if (dailyRate > 0) {
+                    (dailyRate / 8.0) * 1.5
+                } else 0.0
+
+                val regularMins = workedMins - overtimeMins
+                val basePay = if (hourlyRate > 0) {
+                    (regularMins / 60.0) * hourlyRate
+                } else if (dailyRate > 0) {
+                    dailyRate
+                } else 0.0
+
+                val overtimePayCalculated = (overtimeMins / 60.0) * overtimeRate
+                val totalPay = basePay + overtimePayCalculated + existing.allowances - existing.deductions
 
                 val updated = existing.copy(
                     checkOutTime = now,
                     totalWorkingMinutes = workedMins,
                     overtimeMinutes = overtimeMins,
+                    dailyGrossPay = basePay,
+                    overtimePay = overtimePayCalculated,
+                    totalDailyPay = totalPay,
                     notes = if (notes.isNotBlank()) notes else existing.notes
                 )
                 repository.updateAttendanceRecord(updated)
                 logActivity("ATTENDANCE_CHECKOUT", "Checked out employee: ${existing.userName}")
-                showToast("Checked Out ${existing.userName} successfully! Worked: ${workedMins / 60}h ${workedMins % 60}m")
+                showToast("Checked Out ${existing.userName}! Worked: ${workedMins / 60}h ${workedMins % 60}m | Gross Pay: $totalPay")
             } else {
                 showToast("No active check-in found for today.")
             }
@@ -2842,7 +2892,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startBreakEmployee(userId: Long) {
         viewModelScope.launch {
-            val dateStr = SimpleDateFormat("yyyy-MM-DD", Locale.getDefault()).format(Date())
+            val dateStr = getTodayDateString()
             val existing = repository.getAttendanceForUserAndDate(userId, dateStr)
             val now = System.currentTimeMillis()
 
@@ -2858,7 +2908,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun endBreakEmployee(userId: Long) {
         viewModelScope.launch {
-            val dateStr = SimpleDateFormat("yyyy-MM-DD", Locale.getDefault()).format(Date())
+            val dateStr = getTodayDateString()
             val existing = repository.getAttendanceForUserAndDate(userId, dateStr)
             val now = System.currentTimeMillis()
 
@@ -2874,7 +2924,7 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
     fun markEmployeeAttendanceStatus(userId: Long, userName: String, userRole: String, status: String, notes: String = "") {
         viewModelScope.launch {
-            val dateStr = SimpleDateFormat("yyyy-MM-DD", Locale.getDefault()).format(Date())
+            val dateStr = getTodayDateString()
             val existing = repository.getAttendanceForUserAndDate(userId, dateStr)
             val storeId = selectedStoreId.value.let { if (it == 0L) 1L else it }
 
@@ -2882,6 +2932,8 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                 val updated = existing.copy(status = status, notes = notes)
                 repository.updateAttendanceRecord(updated)
             } else {
+                val targetUser = allUsers.value.find { it.id == userId }
+                val basePay = if (status == "PRESENT") (targetUser?.dailyWageRate ?: 0.0) else 0.0
                 val newRec = AttendanceRecord(
                     storeId = storeId,
                     userId = userId,
@@ -2889,12 +2941,70 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                     userRole = userRole,
                     dateStr = dateStr,
                     status = status,
+                    dailyGrossPay = basePay,
+                    totalDailyPay = basePay,
                     notes = notes
                 )
                 repository.saveAttendanceRecord(newRec)
             }
             logActivity("ATTENDANCE_MARKED", "Marked $userName as $status")
             showToast("Marked $userName as $status")
+        }
+    }
+
+    fun updateUserWageRates(
+        userId: Long,
+        dailyWage: Double,
+        hourlyWage: Double,
+        overtimeWage: Double,
+        monthlyBase: Double
+    ) {
+        viewModelScope.launch {
+            val user = allUsers.value.find { it.id == userId }
+            if (user != null) {
+                val updated = user.copy(
+                    dailyWageRate = dailyWage,
+                    hourlyWageRate = hourlyWage,
+                    overtimeHourlyRate = overtimeWage,
+                    monthlyBaseSalary = monthlyBase
+                )
+                repository.saveUser(updated)
+                logActivity("EMPLOYEE_WAGE_UPDATED", "Updated pay rates for ${user.name}")
+                showToast("Updated pay rates & salary for ${user.name}")
+            }
+        }
+    }
+
+    fun updateAttendancePayRecord(
+        recordId: Long,
+        dailyGrossPay: Double,
+        overtimePay: Double,
+        deductions: Double,
+        allowances: Double,
+        notes: String
+    ) {
+        viewModelScope.launch {
+            val record = allAttendanceRecords.value.find { it.id == recordId }
+            if (record != null) {
+                val totalPay = dailyGrossPay + overtimePay + allowances - deductions
+                val updated = record.copy(
+                    dailyGrossPay = dailyGrossPay,
+                    overtimePay = overtimePay,
+                    deductions = deductions,
+                    allowances = allowances,
+                    totalDailyPay = totalPay,
+                    notes = if (notes.isNotBlank()) notes else record.notes
+                )
+                repository.updateAttendanceRecord(updated)
+                showToast("Updated payroll record for ${record.userName}")
+            }
+        }
+    }
+
+    fun deleteAttendanceRecord(record: AttendanceRecord) {
+        viewModelScope.launch {
+            repository.deleteAttendanceRecord(record)
+            showToast("Deleted attendance record for ${record.userName}")
         }
     }
 }

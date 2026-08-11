@@ -334,6 +334,10 @@ data class UserAccount(
     val assignedStoreIdsCsv: String = "", // Comma-separated assigned store IDs e.g. "1,2", or empty for Super Admin
     val lastSelectedStoreId: Long = 0L, // Store selection saved separately for this user
     val isActive: Boolean = true,
+    val dailyWageRate: Double = 0.0,
+    val hourlyWageRate: Double = 0.0,
+    val monthlyBaseSalary: Double = 0.0,
+    val overtimeHourlyRate: Double = 0.0,
     val createdAt: Long = System.currentTimeMillis()
 ) {
     fun getAssignedStoreIdsList(): List<Long> {
@@ -454,6 +458,11 @@ data class AttendanceRecord(
     val breakEndTime: Long? = null,
     val totalWorkingMinutes: Long = 0,
     val overtimeMinutes: Long = 0,
+    val dailyGrossPay: Double = 0.0,
+    val overtimePay: Double = 0.0,
+    val totalDailyPay: Double = 0.0,
+    val deductions: Double = 0.0,
+    val allowances: Double = 0.0,
     val notes: String = "",
     val timestamp: Long = System.currentTimeMillis()
 )

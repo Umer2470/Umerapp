@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Assessment
@@ -236,6 +239,48 @@ fun AppNavigation(viewModel: StoreViewModel) {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route ?: (if (isEmp) Screen.SalesPos.route else Screen.Dashboard.route)
 
+        val drawerItems = remember(isSuperAdmin) {
+            val items = mutableListOf(
+                DrawerMenuItem("Dashboard", Icons.Default.Home, Screen.Dashboard.route),
+                DrawerMenuItem("POS Sale", Icons.Default.PointOfSale, Screen.SalesPos.route),
+                DrawerMenuItem("Products", Icons.Default.Inventory2, Screen.Inventory.route),
+                DrawerMenuItem("Purchase", Icons.Default.ShoppingBag, Screen.Purchase.route),
+                DrawerMenuItem("Customers", Icons.Default.People, Screen.Customers.route),
+                DrawerMenuItem("Suppliers", Icons.Default.Storefront, Screen.Suppliers.route),
+                DrawerMenuItem("Attendance & Payroll", Icons.Default.Schedule, Screen.Attendance.route),
+                DrawerMenuItem("Daily Closing", Icons.Default.Payments, Screen.DailyClosing.route),
+                DrawerMenuItem("Reports", Icons.Default.Assessment, Screen.Reports.route),
+                DrawerMenuItem("Store Access", Icons.Default.Key, Screen.StoreAccessManagement.route),
+                DrawerMenuItem("Staff Roles", Icons.Default.AdminPanelSettings, Screen.UserManagement.route),
+                DrawerMenuItem("Activity Logs", Icons.Default.Shield, Screen.ActivityLogs.route),
+                DrawerMenuItem("Backup & Settings", Icons.Default.Business, Screen.Settings.route),
+                DrawerMenuItem("App Information", Icons.Default.Info, onClick = { showAppInfoDialog = true })
+            )
+
+            if (isSuperAdmin) {
+                items.add(
+                    DrawerMenuItem("Master SaaS Control", Icons.Default.Shield, Screen.MasterOwnerSaaSControl.route)
+                )
+                items.add(
+                    DrawerMenuItem("Developer Mode", Icons.Default.DeveloperMode, onClick = {
+                        devPinInput = ""
+                        devPinError = null
+                        showDeveloperAuthDialog = true
+                    })
+                )
+            }
+
+            items.addAll(
+                listOf(
+                    DrawerMenuItem("About", Icons.Default.Help, onClick = { showAboutDialog = true }),
+                    DrawerMenuItem("Help & Support", Icons.Default.ContactSupport, onClick = { showHelpSupportDialog = true }),
+                    DrawerMenuItem("Logout", Icons.Default.Lock, onClick = { viewModel.logout() })
+                )
+            )
+
+            items
+        }
+
         ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
@@ -310,42 +355,6 @@ fun AppNavigation(viewModel: StoreViewModel) {
                                 .weight(1f)
                                 .verticalScroll(rememberScrollState())
                         ) {
-                            val drawerItems = mutableListOf(
-                                DrawerMenuItem("Dashboard", Icons.Default.Home, Screen.Dashboard.route),
-                                DrawerMenuItem("POS Sale", Icons.Default.PointOfSale, Screen.SalesPos.route),
-                                DrawerMenuItem("Products", Icons.Default.Inventory2, Screen.Inventory.route),
-                                DrawerMenuItem("Purchase", Icons.Default.ShoppingBag, Screen.Purchase.route),
-                                DrawerMenuItem("Customers", Icons.Default.People, Screen.Customers.route),
-                                DrawerMenuItem("Suppliers", Icons.Default.Storefront, Screen.Suppliers.route),
-                                DrawerMenuItem("Reports", Icons.Default.Assessment, Screen.Reports.route),
-                                DrawerMenuItem("Store Access", Icons.Default.Key, Screen.StoreAccessManagement.route),
-                                DrawerMenuItem("Staff Roles", Icons.Default.AdminPanelSettings, Screen.UserManagement.route),
-                                DrawerMenuItem("Security", Icons.Default.Security, Screen.StoreAccessManagement.route),
-                                DrawerMenuItem("Activity Logs", Icons.Default.Shield, Screen.ActivityLogs.route),
-                                DrawerMenuItem("Backup & Restore", Icons.Default.CloudSync, Screen.Settings.route),
-                                DrawerMenuItem("Business Settings", Icons.Default.Business, Screen.Settings.route),
-                                DrawerMenuItem("User Permissions", Icons.Default.Lock, Screen.UserManagement.route),
-                                DrawerMenuItem("App Information", Icons.Default.Info, onClick = { showAppInfoDialog = true })
-                            )
-
-                            if (isSuperAdmin) {
-                                drawerItems.add(
-                                    DrawerMenuItem("Developer Mode", Icons.Default.DeveloperMode, onClick = {
-                                        devPinInput = ""
-                                        devPinError = null
-                                        showDeveloperAuthDialog = true
-                                    })
-                                )
-                            }
-
-                            drawerItems.addAll(
-                                listOf(
-                                    DrawerMenuItem("About", Icons.Default.Help, onClick = { showAboutDialog = true }),
-                                    DrawerMenuItem("Help & Support", Icons.Default.ContactSupport, onClick = { showHelpSupportDialog = true }),
-                                    DrawerMenuItem("Logout", Icons.Default.Lock, onClick = { viewModel.logout() })
-                                )
-                            )
-
                             drawerItems.forEach { item ->
                                 val selected = item.route != null && currentRoute == item.route
                                 NavigationDrawerItem(
@@ -403,7 +412,137 @@ fun AppNavigation(viewModel: StoreViewModel) {
                 }
             }
         ) {
-            Scaffold(
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val isDesktop = maxWidth >= 720.dp
+
+                Row(modifier = Modifier.fillMaxSize()) {
+                    if (isDesktop) {
+                        Surface(
+                            modifier = Modifier
+                                .width(260.dp)
+                                .fillMaxHeight(),
+                            color = Color(0xFF0F2537),
+                            tonalElevation = 6.dp
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(14.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                ) {
+                                    ShopLogoAvatar(
+                                        logoUri = settings.logoUri,
+                                        size = 40.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = settings.storeName,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFFFD700),
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = settings.ownerName.ifBlank { "Store Owner" },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color.White.copy(alpha = 0.8f),
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF1E293B))
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AccountCircle,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFFD700),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = currentUser?.name ?: "User",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "Role: ${currentUser?.role ?: "SUPER_ADMIN"}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFF38BDF8)
+                                        )
+                                    }
+                                }
+
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.15f), modifier = Modifier.padding(vertical = 10.dp))
+
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    drawerItems.forEach { item ->
+                                        val selected = item.route != null && currentRoute == item.route
+                                        Surface(
+                                            onClick = {
+                                                if (item.onClick != null) {
+                                                    item.onClick.invoke()
+                                                } else if (item.route != null && currentRoute != item.route) {
+                                                    navController.navigate(item.route) {
+                                                        popUpTo(navController.graph.findStartDestination().id) {
+                                                            saveState = true
+                                                        }
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (selected) Color(0xFF1E3A8A) else Color.Transparent,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 2.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = item.icon,
+                                                    contentDescription = item.label,
+                                                    tint = if (item.label == "Logout") Color(0xFFF87171) else if (selected) Color(0xFFFFD700) else Color.White.copy(alpha = 0.8f),
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(10.dp))
+                                                Text(
+                                                    text = item.label,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (item.label == "Logout") Color(0xFFF87171) else if (selected) Color(0xFFFFD700) else Color.White.copy(alpha = 0.9f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Scaffold(
+                        modifier = Modifier.weight(1f),
                 topBar = {
                     TopAppBar(
                         navigationIcon = {
@@ -578,49 +717,51 @@ fun AppNavigation(viewModel: StoreViewModel) {
                     )
                 },
                 bottomBar = {
-                    NavigationBar(
-                        containerColor = Color(0xFF0F2537),
-                        tonalElevation = 8.dp
-                    ) {
-                        navItems.forEach { item ->
-                            val selected = currentRoute == item.screen.route
-                            NavigationBarItem(
-                                selected = selected,
-                                onClick = {
-                                    if (currentRoute != item.screen.route) {
-                                        navController.navigate(item.screen.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
+                    if (!isDesktop) {
+                        NavigationBar(
+                            containerColor = Color(0xFF0F2537),
+                            tonalElevation = 8.dp
+                        ) {
+                            navItems.forEach { item ->
+                                val selected = currentRoute == item.screen.route
+                                NavigationBarItem(
+                                    selected = selected,
+                                    onClick = {
+                                        if (currentRoute != item.screen.route) {
+                                            navController.navigate(item.screen.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
                                             }
-                                            launchSingleTop = true
-                                            restoreState = true
                                         }
-                                    }
-                                },
-                                icon = {
-                                    Icon(
-                                        imageVector = item.icon,
-                                        contentDescription = item.label,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        text = item.label,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 11.sp,
-                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                    },
+                                    icon = {
+                                        Icon(
+                                            imageVector = item.icon,
+                                            contentDescription = item.label,
+                                            modifier = Modifier.size(22.dp)
                                         )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = item.label,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 11.sp,
+                                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        )
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = Color(0xFF0F2537),
+                                        selectedTextColor = Color(0xFFFFD700),
+                                        unselectedIconColor = Color.White.copy(alpha = 0.6f),
+                                        unselectedTextColor = Color.White.copy(alpha = 0.6f),
+                                        indicatorColor = Color(0xFFFFD700)
                                     )
-                                },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Color(0xFF0F2537),
-                                    selectedTextColor = Color(0xFFFFD700),
-                                    unselectedIconColor = Color.White.copy(alpha = 0.6f),
-                                    unselectedTextColor = Color.White.copy(alpha = 0.6f),
-                                    indicatorColor = Color(0xFFFFD700)
                                 )
-                            )
+                            }
                         }
                     }
                 },
@@ -705,10 +846,15 @@ fun AppNavigation(viewModel: StoreViewModel) {
                     composable(Screen.DeveloperMode.route) {
                         DeveloperPanelScreen(viewModel = viewModel)
                     }
+
+                    composable(Screen.MasterOwnerSaaSControl.route) {
+                        MasterOwnerSaaSControlScreen(viewModel = viewModel)
+                    }
                 }
             }
         }
     }
+}
 
     if (showProfileDialog) {
         AlertDialog(
@@ -900,6 +1046,7 @@ fun AppNavigation(viewModel: StoreViewModel) {
     }
 
     StoreSelectionDialog(viewModel = viewModel)
+    }
 }
 
 @Composable

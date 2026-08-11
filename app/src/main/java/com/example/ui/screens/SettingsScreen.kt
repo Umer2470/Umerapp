@@ -641,35 +641,35 @@ fun SettingsScreen(viewModel: StoreViewModel) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Enable App PIN Lock", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                        Text("Require 4-digit PIN on store app start", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                if (viewModel.isSuperAdmin()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Enable App PIN Lock", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            Text("Require 4-digit PIN on store app start", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        }
+
+                        Switch(
+                            checked = settings.isPinEnabled,
+                            onCheckedChange = { viewModel.togglePinSecurity(it) }
+                        )
                     }
 
-                    Switch(
-                        checked = settings.isPinEnabled,
-                        onCheckedChange = { viewModel.togglePinSecurity(it) }
-                    )
-                }
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = { showPinChangeModal = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Lock, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Change 4-Digit Security PIN")
+                    }
 
-                OutlinedButton(
-                    onClick = { showPinChangeModal = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.Lock, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Change 4-Digit Security PIN")
-                }
-
-                if (viewModel.isSuperAdmin()) {
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Button(
@@ -687,6 +687,25 @@ fun SettingsScreen(viewModel: StoreViewModel) {
                         Icon(imageVector = Icons.Default.Shield, contentDescription = null, tint = Color(0xFF38BDF8))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("3-Level Emergency Recovery Settings", color = Color.White)
+                    }
+                } else {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFFF1F5F9),
+                        border = BorderStroke(1.dp, Color(0xFFCBD5E1))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = Color(0xFF475569))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("Security Settings Managed by Super Admin", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF0F172A))
+                                Text("Password, PIN, and security credentials can only be changed or reset by Super Admin / Owner.", fontSize = 11.sp, color = Color(0xFF64748B))
+                            }
+                        }
                     }
                 }
             }
@@ -1014,11 +1033,15 @@ fun SettingsScreen(viewModel: StoreViewModel) {
 
     // Change PIN Modal
     if (showPinChangeModal) {
-        var newPin by remember { mutableStateOf("") }
-        var confirmPin by remember { mutableStateOf("") }
-        var pinErr by remember { mutableStateOf<String?>(null) }
+        if (!viewModel.isSuperAdmin()) {
+            showPinChangeModal = false
+            viewModel.showToast("Permission Denied: Only Super Admin can change PIN/Password credentials.")
+        } else {
+            var newPin by remember { mutableStateOf("") }
+            var confirmPin by remember { mutableStateOf("") }
+            var pinErr by remember { mutableStateOf<String?>(null) }
 
-        AlertDialog(
+            AlertDialog(
             onDismissRequest = { showPinChangeModal = false },
             title = { Text("Change 4-Digit Security PIN") },
             text = {
@@ -1066,6 +1089,7 @@ fun SettingsScreen(viewModel: StoreViewModel) {
             },
             dismissButton = { TextButton(onClick = { showPinChangeModal = false }) { Text("Cancel") } }
         )
+        }
     }
 
     // Export Backup Modal

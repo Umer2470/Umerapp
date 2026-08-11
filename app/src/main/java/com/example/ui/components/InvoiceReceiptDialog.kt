@@ -269,6 +269,22 @@ fun InvoiceReceiptDialog(
                                 Text("${settings.currencySymbol} ${sale.dueAmount.toInt()}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color.Red)
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // QR Verification Section (Mobile Preview)
+                        InvoiceQrCodeSection(
+                            storeName = settings.storeName,
+                            invoiceNumber = sale.invoiceNumber,
+                            formattedDate = formattedDate,
+                            customerName = sale.customerName,
+                            totalAmount = sale.netAmount,
+                            currencySymbol = settings.currencySymbol,
+                            paidAmount = sale.paidAmount,
+                            dueAmount = sale.dueAmount,
+                            paymentType = sale.paymentType,
+                            timestamp = sale.timestamp
+                        )
                     }
                 } else {
                     // Thermal Roll Visual Receipt Preview (Monospace / Realistic Roll)
@@ -361,13 +377,28 @@ fun InvoiceReceiptDialog(
                             Text("${settings.currencySymbol} ${sale.paidAmount.toInt()}", style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace))
                         }
 
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        InvoiceQrCodeSection(
+                            storeName = settings.storeName,
+                            invoiceNumber = sale.invoiceNumber,
+                            formattedDate = formattedDate,
+                            customerName = sale.customerName,
+                            totalAmount = sale.netAmount,
+                            currencySymbol = settings.currencySymbol,
+                            paidAmount = sale.paidAmount,
+                            dueAmount = sale.dueAmount,
+                            paymentType = sale.paymentType,
+                            timestamp = sale.timestamp
+                        )
+
                         Text(
                             text = "*** THANK YOU ***",
                             style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                             textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 4.dp)
+                                .padding(top = 6.dp)
                         )
                     }
                 }

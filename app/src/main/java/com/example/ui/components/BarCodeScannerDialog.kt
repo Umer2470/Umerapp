@@ -87,6 +87,20 @@ fun BarCodeScannerDialog(
         )
     }
     var isFlashOn by remember { mutableStateOf(false) }
+    var scannedInvoicePayload by remember { mutableStateOf<String?>(null) }
+
+    fun processScannedCode(code: String) {
+        val trimmed = code.trim()
+        if (trimmed.contains("INVOICE VERIFICATION", ignoreCase = true) ||
+            trimmed.contains("Invoice Number:", ignoreCase = true) ||
+            trimmed.startsWith("VER-", ignoreCase = true) ||
+            trimmed.startsWith("INV-", ignoreCase = true)
+        ) {
+            scannedInvoicePayload = trimmed
+        } else {
+            onBarcodeScanned(trimmed)
+        }
+    }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -270,7 +284,7 @@ fun BarCodeScannerDialog(
                     keyboardActions = KeyboardActions(
                         onDone = {
                             if (manualBarcode.isNotBlank()) {
-                                onBarcodeScanned(manualBarcode.trim())
+                                processScannedCode(manualBarcode)
                             }
                         }
                     )
@@ -344,14 +358,14 @@ fun BarCodeScannerDialog(
             Button(
                 onClick = {
                     if (manualBarcode.isNotBlank()) {
-                        onBarcodeScanned(manualBarcode.trim())
+                        processScannedCode(manualBarcode)
                     }
                 },
                 enabled = manualBarcode.isNotBlank()
             ) {
                 Icon(Icons.Default.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Select & Add")
+                Text("Scan / Process")
             }
         },
         dismissButton = {
@@ -360,5 +374,12 @@ fun BarCodeScannerDialog(
             }
         }
     )
+
+    if (scannedInvoicePayload != null) {
+        ScannedInvoiceVerificationDialog(
+            qrText = scannedInvoicePayload!!,
+            onDismiss = { scannedInvoicePayload = null }
+        )
+    }
 }
 

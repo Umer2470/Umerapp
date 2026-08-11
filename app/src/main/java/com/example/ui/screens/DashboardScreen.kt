@@ -273,7 +273,7 @@ fun DashboardScreen(
             add(ModuleItem("Suppliers", Icons.Default.Apartment, Color(0xFFFEF3C7), Color(0xFFD97706)) { onNavigate(Screen.Suppliers.route) })
             add(ModuleItem("Expenses", Icons.Default.AccountBalanceWallet, Color(0xFFFEE2E2), Color(0xFFDC2626)) { showAddExpenseModal = true })
             add(ModuleItem("Cash Book", Icons.Default.MenuBook, Color(0xFFD1FAE5), Color(0xFF059669)) { showCashBookModal = true })
-            add(ModuleItem("Attendance", Icons.Default.Schedule, Color(0xFFEDE9FE), Color(0xFF6366F1)) { onNavigate(Screen.UserManagement.route) })
+            add(ModuleItem("Attendance", Icons.Default.Schedule, Color(0xFFEDE9FE), Color(0xFF6366F1)) { onNavigate(Screen.Attendance.route) })
             add(ModuleItem("Employee Mgmt", Icons.Default.People, Color(0xFFF3E8FF), Color(0xFF9333EA)) { onNavigate(Screen.UserManagement.route) })
             add(ModuleItem("Staff Roles", Icons.Default.AdminPanelSettings, Color(0xFFCFFAFE), Color(0xFF0891B2)) { onNavigate(Screen.UserManagement.route) })
             add(ModuleItem("Daily Closing", Icons.Default.ReceiptLong, Color(0xFFFEF3C7), Color(0xFFD97706)) { onNavigate(Screen.DailyClosing.route) })
@@ -975,7 +975,7 @@ fun DashboardScreen(
                             checkOutTimeText = checkOutTimeText,
                             onMinimize = { viewModel.setAttendanceMinimized(true) },
                             onHide = { viewModel.setAttendanceHidden(true) },
-                            onManageClick = { onNavigate(Screen.UserManagement.route) }
+                            onManageClick = { onNavigate(Screen.Attendance.route) }
                         )
                     }
                 }
