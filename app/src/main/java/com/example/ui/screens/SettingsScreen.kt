@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LightMode
@@ -655,6 +656,33 @@ fun SettingsScreen(viewModel: StoreViewModel) {
                         Switch(
                             checked = settings.isPinEnabled,
                             onCheckedChange = { viewModel.togglePinSecurity(it) }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Fingerprint,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Biometric / Face / Fingerprint Unlock", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                            }
+                            Text("Unlock app and sensitive POS data via biometrics on launch", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        }
+
+                        Switch(
+                            checked = settings.isBiometricEnabled,
+                            onCheckedChange = { viewModel.toggleBiometricSecurity(it) }
                         )
                     }
 

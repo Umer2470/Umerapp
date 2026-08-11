@@ -1385,6 +1385,18 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun toggleBiometricSecurity(enabled: Boolean) {
+        viewModelScope.launch {
+            if (!isSuperAdmin()) {
+                showToast("Permission Denied: Only Super Admin can change biometric security settings.")
+                return@launch
+            }
+            val s = repository.getSettingsSync()
+            repository.saveSettings(s.copy(isBiometricEnabled = enabled))
+            showToast(if (enabled) "Biometric / Fingerprint Unlock Enabled" else "Biometric / Fingerprint Unlock Disabled")
+        }
+    }
+
     // --- SUPER ADMIN 3-LEVEL RECOVERY SYSTEM ---
     suspend fun getSuperAdminRecoverySync(): SuperAdminRecovery? {
         return repository.getSuperAdminRecoverySync()

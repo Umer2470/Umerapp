@@ -16,6 +16,7 @@ data class StoreSettings(
     val businessType: String = "",
     val pinCode: String = "1234",
     val isPinEnabled: Boolean = true,
+    val isBiometricEnabled: Boolean = true,
     val currencySymbol: String = "Rs.",
     val taxPercentage: Double = 0.0,
     val defaultLowStockThreshold: Double = 5.0,

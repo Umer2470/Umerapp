@@ -72,16 +72,26 @@ fun LoginScreen(viewModel: StoreViewModel) {
     val triggerBiometricAuth = {
         BiometricPromptHelper.authenticateSuperAdmin(
             context = context,
-            title = "Super Admin Biometric Security",
-            subtitle = "Verify fingerprint or biometric to access Super Admin features",
+            title = "Biometric Security Unlock",
+            subtitle = "Verify fingerprint or face unlock to access store POS and financial data",
             onSuccess = {
                 viewModel.loginWithFingerprint()
             },
             onError = { err ->
                 viewModel.showToast(err)
-                viewModel.loginWithFingerprint()
             }
         )
+    }
+
+    // Auto-prompt Biometric unlock if enabled in settings and hardware available
+    LaunchedEffect(settings.isBiometricEnabled) {
+        if (settings.isBiometricEnabled) {
+            val (available, _) = BiometricPromptHelper.isBiometricAvailable(context)
+            if (available) {
+                delay(300L)
+                triggerBiometricAuth()
+            }
+        }
     }
 
     // Live Clock Effect
@@ -317,7 +327,7 @@ fun LoginScreen(viewModel: StoreViewModel) {
                                                         "FP" -> {
                                                             val isSuperAdminFp = detectedUser == null || detectedUser?.role == "SUPER_ADMIN"
                                                             if (isSuperAdminFp) {
-                                                                viewModel.loginWithFingerprint()
+                                                                triggerBiometricAuth()
                                                             } else {
                                                                 viewModel.showToast("Fingerprint Login is available only for Super Admin.")
                                                             }
