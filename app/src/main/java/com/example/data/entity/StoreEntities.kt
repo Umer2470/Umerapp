@@ -38,7 +38,11 @@ data class StoreSettings(
     val isAttendanceEnabled: Boolean = true,
     val isEmployeeCommissionEnabled: Boolean = true,
     val invoiceHeader: String = "Thank you for shopping with us!",
-    val invoiceFooter: String = "Software Powered by Al-Khair Store Manager & POS"
+    val invoiceFooter: String = "Software Powered by Al-Khair Store Manager & POS",
+    val defaultCashierName: String = "",
+    val defaultCashierEmployeeId: String = "",
+    val defaultCashierPhone: String = "",
+    val defaultCashierDesignation: String = "Cashier"
 )
 
 @Entity(
@@ -190,6 +194,8 @@ data class Sale(
     val paidAmount: Double,
     val dueAmount: Double,
     val paymentType: String = "Cash", // Cash, Udhaar / Credit, Card
+    val cashierName: String = "", // Cashier / Operator recorded for this specific invoice
+    val cashierId: Long? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 

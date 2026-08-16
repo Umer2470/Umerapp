@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.dao.StoreDao
 import com.example.data.entity.CategoryEntity
 import com.example.data.entity.Customer
@@ -54,7 +56,7 @@ import com.example.data.entity.AttendanceRecord
         SuperAdminRecovery::class,
         AttendanceRecord::class
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 abstract class StoreDatabase : RoomDatabase() {
@@ -63,6 +65,29 @@ abstract class StoreDatabase : RoomDatabase() {
 
     companion object {
         const val DB_NAME = "store_manager_pos.db"
+
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE store_settings ADD COLUMN defaultCashierName TEXT NOT NULL DEFAULT ''")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE store_settings ADD COLUMN defaultCashierEmployeeId TEXT NOT NULL DEFAULT ''")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE store_settings ADD COLUMN defaultCashierPhone TEXT NOT NULL DEFAULT ''")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE store_settings ADD COLUMN defaultCashierDesignation TEXT NOT NULL DEFAULT 'Cashier'")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE sales ADD COLUMN cashierName TEXT NOT NULL DEFAULT ''")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE sales ADD COLUMN cashierId INTEGER DEFAULT NULL")
+                } catch (_: Exception) {}
+            }
+        }
 
         @Volatile
         private var INSTANCE: StoreDatabase? = null
@@ -74,6 +99,7 @@ abstract class StoreDatabase : RoomDatabase() {
                     StoreDatabase::class.java,
                     DB_NAME
                 )
+                .addMigrations(MIGRATION_18_19)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

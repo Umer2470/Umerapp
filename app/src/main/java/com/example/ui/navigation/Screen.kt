@@ -3,6 +3,7 @@ package com.example.ui.navigation
 sealed class Screen(val route: String, val title: String) {
     object Login : Screen("login", "PIN Security")
     object Dashboard : Screen("dashboard", "Dashboard")
+    object StoreManagement : Screen("store_management", "Store Management Center")
     object Inventory : Screen("inventory", "Inventory & Stock")
     object SalesPos : Screen("sales_pos", "Sales / POS Billing")
     object Purchase : Screen("purchase", "Purchase Stock")

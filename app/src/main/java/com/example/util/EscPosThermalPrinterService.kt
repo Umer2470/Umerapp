@@ -69,10 +69,16 @@ object EscPosThermalPrinterService {
 
         val dateFormat = SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault())
         val formattedDate = dateFormat.format(Date(sale.timestamp))
+        val resolvedCashier = when {
+            sale.cashierName.isNotBlank() -> sale.cashierName
+            settings.defaultCashierName.isNotBlank() -> settings.defaultCashierName
+            else -> "Not Assigned"
+        }
 
         stream.write("Invoice #: ${sale.invoiceNumber}\n".toByteArray(Charsets.UTF_8))
         stream.write("Date:     $formattedDate\n".toByteArray(Charsets.UTF_8))
         stream.write("Customer: ${sale.customerName}\n".toByteArray(Charsets.UTF_8))
+        stream.write("Cashier:  $resolvedCashier\n".toByteArray(Charsets.UTF_8))
         stream.write("Pay Mode: ${sale.paymentType}\n".toByteArray(Charsets.UTF_8))
         stream.write(dashLine.toByteArray(Charsets.UTF_8))
 

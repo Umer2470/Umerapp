@@ -48,12 +48,14 @@ object PdfGenerator {
         sale: Sale,
         items: List<SaleItem>,
         settings: StoreSettings,
-        format: ReceiptFormat = ReceiptFormat.A4
+        format: ReceiptFormat = ReceiptFormat.A4,
+        cashierName: String? = null
     ): File? {
         val formattedInvoice = InvoiceFormattingService.formatSaleTransaction(
             sale = sale,
             items = items,
-            settings = settings
+            settings = settings,
+            cashierName = cashierName
         )
         return generateFromInvoice(context, formattedInvoice, format)
     }
@@ -63,9 +65,10 @@ object PdfGenerator {
         sale: Sale,
         items: List<SaleItem>,
         settings: StoreSettings,
-        format: ReceiptFormat = ReceiptFormat.A4
+        format: ReceiptFormat = ReceiptFormat.A4,
+        cashierName: String? = null
     ): File? {
-        return generatePrintablePdfInvoice(context, sale, items, settings, format)
+        return generatePrintablePdfInvoice(context, sale, items, settings, format, cashierName)
     }
 
     fun generateFromInvoice(

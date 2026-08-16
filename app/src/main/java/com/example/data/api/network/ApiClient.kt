@@ -17,10 +17,14 @@ import java.util.concurrent.TimeUnit
  * Central ApiClient factory configuring Retrofit, OkHttpClient, timeouts,
  * JSON converters, and security interceptors for the Developer API layer.
  */
-class ApiClient private constructor(context: Context) {
+class ApiClient private constructor(private val context: Context) {
 
     private val identityManager = SecureIdentityManager.getInstance(context)
     private val tokenManager = SecureTokenManager.getInstance(context)
+
+    init {
+        ApiConfig.init(context)
+    }
 
     val moshi: Moshi = Moshi.Builder()
         .addLast(KotlinJsonAdapterFactory())
@@ -39,16 +43,44 @@ class ApiClient private constructor(context: Context) {
         .addInterceptor(loggingInterceptor)
         .build()
 
-    private val retrofit: Retrofit by lazy {
-        Retrofit.Builder()
-            .baseUrl(ApiConfig.getBaseUrl())
+    @Volatile
+    private var currentBaseUrl: String = ApiConfig.getBaseUrl()
+
+    @Volatile
+    private var retrofitInstance: Retrofit = buildRetrofit(currentBaseUrl)
+
+    @Volatile
+    private var apiServiceInstance: DeveloperApiService = retrofitInstance.create(DeveloperApiService::class.java)
+
+    private fun buildRetrofit(baseUrl: String): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(baseUrl)
             .client(okHttpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
     }
 
-    val apiService: DeveloperApiService by lazy {
-        retrofit.create(DeveloperApiService::class.java)
+    val apiService: DeveloperApiService
+        get() {
+            val activeUrl = ApiConfig.getBaseUrl()
+            if (activeUrl != currentBaseUrl) {
+                synchronized(this) {
+                    if (activeUrl != currentBaseUrl) {
+                        currentBaseUrl = activeUrl
+                        retrofitInstance = buildRetrofit(activeUrl)
+                        apiServiceInstance = retrofitInstance.create(DeveloperApiService::class.java)
+                    }
+                }
+            }
+            return apiServiceInstance
+        }
+
+    fun notifyBaseUrlChanged() {
+        synchronized(this) {
+            currentBaseUrl = ApiConfig.getBaseUrl()
+            retrofitInstance = buildRetrofit(currentBaseUrl)
+            apiServiceInstance = retrofitInstance.create(DeveloperApiService::class.java)
+        }
     }
 
     companion object {

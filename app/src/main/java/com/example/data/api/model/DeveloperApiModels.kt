@@ -4,8 +4,25 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 /**
- * Data Transfer Objects for the Developer API Connection Layer.
+ * Data Transfer Objects for the Developer API Connection Layer (CH UMER DEVELOPER APP).
  */
+
+@JsonClass(generateAdapter = true)
+data class HealthCheckResponse(
+    @Json(name = "status") val status: String = "ok",
+    @Json(name = "message") val message: String? = "Developer server healthy",
+    @Json(name = "timestamp") val timestamp: Long? = null,
+    @Json(name = "version") val version: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ServerConfigResponse(
+    @Json(name = "status") val status: String = "ok",
+    @Json(name = "api_version") val apiVersion: String = "v1",
+    @Json(name = "features") val features: Map<String, Boolean>? = null,
+    @Json(name = "heartbeat_interval_seconds") val heartbeatIntervalSeconds: Long? = 86400L,
+    @Json(name = "message") val message: String? = null
+)
 
 @JsonClass(generateAdapter = true)
 data class RegisterInstallationRequest(
@@ -19,12 +36,36 @@ data class RegisterInstallationRequest(
 
 @JsonClass(generateAdapter = true)
 data class RegisterInstallationResponse(
-    @Json(name = "success") val success: Boolean,
+    @Json(name = "success") val success: Boolean = true,
     @Json(name = "installation_id") val installationId: String,
     @Json(name = "message") val message: String = "Registration successful",
     @Json(name = "access_token") val accessToken: String? = null,
     @Json(name = "refresh_token") val refreshToken: String? = null,
     @Json(name = "expires_in") val expiresIn: Long? = 3600L
+)
+
+@JsonClass(generateAdapter = true)
+data class InstallationActivateRequest(
+    @Json(name = "installation_id") val installationId: String,
+    @Json(name = "activation_code") val activationCode: String,
+    @Json(name = "customer_id") val customerId: String = "CUST-DEFAULT",
+    @Json(name = "store_id") val storeId: Long = 1L,
+    @Json(name = "app_version") val appVersion: String,
+    @Json(name = "platform") val platform: String = "Android",
+    @Json(name = "timestamp") val timestamp: Long = System.currentTimeMillis()
+)
+
+@JsonClass(generateAdapter = true)
+data class InstallationActivateResponse(
+    @Json(name = "status") val status: String = "ACTIVE", // ACTIVE, ACTIVATED, INVALID, EXPIRED, REVOKED, ALREADY_USED, INSTALLATION_MISMATCH
+    @Json(name = "message") val message: String = "Activation successful",
+    @Json(name = "activation_token") val activationToken: String? = null,
+    @Json(name = "activated_at") val activatedAt: Long? = null,
+    @Json(name = "customer_id") val customerId: String? = null,
+    @Json(name = "license_id") val licenseId: String? = null,
+    @Json(name = "plan_type") val planType: String? = "COMMERCIAL",
+    @Json(name = "max_shops") val maxShops: Int? = 10,
+    @Json(name = "max_users") val maxUsers: Int? = 25
 )
 
 @JsonClass(generateAdapter = true)
@@ -37,7 +78,7 @@ data class LicenseValidateRequest(
 
 @JsonClass(generateAdapter = true)
 data class LicenseValidateResponse(
-    @Json(name = "status") val status: String, // "active", "suspended", "expired", "update_required"
+    @Json(name = "status") val status: String = "active", // "active", "suspended", "expired", "update_required"
     @Json(name = "valid_until") val validUntil: Long? = null,
     @Json(name = "plan_type") val planType: String? = "COMMERCIAL",
     @Json(name = "max_shops") val maxShops: Int? = 5,
@@ -55,7 +96,7 @@ data class LicenseHeartbeatRequest(
 
 @JsonClass(generateAdapter = true)
 data class LicenseHeartbeatResponse(
-    @Json(name = "status") val status: String,
+    @Json(name = "status") val status: String = "active",
     @Json(name = "server_time") val serverTime: Long = System.currentTimeMillis(),
     @Json(name = "next_heartbeat_seconds") val nextHeartbeatInSeconds: Long = 86400L,
     @Json(name = "message") val message: String = "Heartbeat acknowledged"

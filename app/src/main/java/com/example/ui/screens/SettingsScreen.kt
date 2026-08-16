@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
@@ -36,6 +38,9 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Security
@@ -111,6 +116,13 @@ fun SettingsScreen(viewModel: StoreViewModel) {
     var currency by remember(settings) { mutableStateOf(settings.currencySymbol) }
     var logoUri by remember(settings) { mutableStateOf(settings.logoUri) }
     var lowStockThresholdInput by remember(settings) { mutableStateOf(settings.defaultLowStockThreshold.toInt().toString()) }
+
+    var cashierNameInput by remember(settings) { mutableStateOf(settings.defaultCashierName) }
+    var cashierEmpIdInput by remember(settings) { mutableStateOf(settings.defaultCashierEmployeeId) }
+    var cashierPhoneInput by remember(settings) { mutableStateOf(settings.defaultCashierPhone) }
+    var cashierDesignationInput by remember(settings) { mutableStateOf(settings.defaultCashierDesignation.ifBlank { "Cashier" }) }
+
+    val allUsers by viewModel.allUsers.collectAsState()
 
     var showPinChangeModal by remember { mutableStateOf(false) }
     var showBackupModal by remember { mutableStateOf(false) }
@@ -271,6 +283,201 @@ fun SettingsScreen(viewModel: StoreViewModel) {
                     Icon(imageVector = Icons.Default.Save, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Save Store Info & Settings")
+                }
+            }
+        }
+
+        // CASHIER / OPERATOR PROFILE SECTION
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Badge,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text("Cashier / Operator Profile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("Configure operator details printed on invoices & receipts", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Active Cashier Preview Card
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.ReceiptLong, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                        Column {
+                            Text(
+                                text = "Active Cashier on Invoices:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (cashierNameInput.isNotBlank()) "$cashierNameInput (${cashierDesignationInput.ifBlank { "Cashier" }})" else "Not Assigned",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            if (cashierEmpIdInput.isNotBlank() || cashierPhoneInput.isNotBlank()) {
+                                val details = listOfNotNull(
+                                    if (cashierEmpIdInput.isNotBlank()) "ID: $cashierEmpIdInput" else null,
+                                    if (cashierPhoneInput.isNotBlank()) "Ph: $cashierPhoneInput" else null
+                                ).joinToString(" • ")
+                                Text(
+                                    text = details,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
+                    value = cashierNameInput,
+                    onValueChange = { cashierNameInput = it },
+                    label = { Text("Cashier / Operator Name") },
+                    placeholder = { Text("e.g. Ali Raza or Muhammad Usman") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = cashierEmpIdInput,
+                        onValueChange = { cashierEmpIdInput = it },
+                        label = { Text("Employee ID") },
+                        placeholder = { Text("e.g. EMP-001") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = cashierDesignationInput,
+                        onValueChange = { cashierDesignationInput = it },
+                        label = { Text("Designation") },
+                        placeholder = { Text("Cashier") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = cashierPhoneInput,
+                    onValueChange = { cashierPhoneInput = it },
+                    label = { Text("Cashier Phone (Optional)") },
+                    placeholder = { Text("e.g. 0300-1234567") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) }
+                )
+
+                // Quick Select From Registered Staff
+                if (allUsers.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Quick Select from Registered Staff:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        allUsers.take(4).forEach { user ->
+                            OutlinedButton(
+                                onClick = {
+                                    cashierNameInput = user.name
+                                    cashierEmpIdInput = if (user.id > 0) user.id.toString() else ""
+                                    cashierPhoneInput = user.phone
+                                    cashierDesignationInput = if (user.role == "EMPLOYEE") "Cashier" else if (user.role == "ADMIN") "Store Admin" else user.role
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(user.name.take(14), fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (cashierNameInput.isNotBlank() || cashierEmpIdInput.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = {
+                                cashierNameInput = ""
+                                cashierEmpIdInput = ""
+                                cashierPhoneInput = ""
+                                cashierDesignationInput = "Cashier"
+                                viewModel.clearCashierProfile()
+                            },
+                            modifier = Modifier.weight(0.35f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Reset")
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            viewModel.updateCashierProfile(
+                                name = cashierNameInput,
+                                employeeId = cashierEmpIdInput,
+                                phone = cashierPhoneInput,
+                                designation = cashierDesignationInput
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Save, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Save Cashier Profile")
+                    }
                 }
             }
         }

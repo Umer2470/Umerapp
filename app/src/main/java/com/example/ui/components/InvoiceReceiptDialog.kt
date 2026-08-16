@@ -79,6 +79,11 @@ fun InvoiceReceiptDialog(
     val context = LocalContext.current
     val dateFormatter = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
     val formattedDate = dateFormatter.format(Date(sale.timestamp))
+    val resolvedCashier = when {
+        sale.cashierName.isNotBlank() -> sale.cashierName
+        settings.defaultCashierName.isNotBlank() -> settings.defaultCashierName
+        else -> "Not Assigned"
+    }
 
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showPrintPreviewDialog by remember { mutableStateOf(false) }
@@ -213,6 +218,7 @@ fun InvoiceReceiptDialog(
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 Text("Invoice: ${sale.invoiceNumber}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                Text("Cashier: $resolvedCashier", style = MaterialTheme.typography.bodySmall, color = Color.DarkGray)
                                 Text(formattedDate, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                             }
                         }
@@ -325,6 +331,7 @@ fun InvoiceReceiptDialog(
                             Text(sale.paymentType, style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace))
                         }
                         Text("CUST: ${sale.customerName}", style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace))
+                        Text("CASHIER: $resolvedCashier", style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace))
                         Text("DATE: $formattedDate", style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace))
 
                         Text(
@@ -423,6 +430,7 @@ fun InvoiceReceiptDialog(
                             appendLine("--------------------------")
                             appendLine("Invoice #: *${sale.invoiceNumber}*")
                             appendLine("Customer: *${sale.customerName}*")
+                            appendLine("Cashier: *${resolvedCashier}*")
                             appendLine("Date: $formattedDate")
                             appendLine("--------------------------")
                             for (item in items) {
@@ -564,6 +572,7 @@ fun InvoiceReceiptDialog(
                                     appendLine("${settings.storeName}")
                                     appendLine("Invoice: ${sale.invoiceNumber}")
                                     appendLine("Customer: ${sale.customerName}")
+                                    appendLine("Cashier: $resolvedCashier")
                                     appendLine("Date: $formattedDate")
                                     appendLine("--------------------------")
                                     for (item in items) {

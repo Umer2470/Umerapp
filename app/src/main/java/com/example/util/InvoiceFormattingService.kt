@@ -121,8 +121,9 @@ object InvoiceFormattingService {
     ): String {
         val verId = getInvoiceVerificationId(invoiceNumber, timestamp)
         val payStatus = getPaymentStatusString(paidAmount, dueAmount, paymentType, currencySymbol)
+        val headerTitle = storeName.ifBlank { "OFFICIAL STORE" }.uppercase(Locale.US)
         return """
-=== CH UMAIR SENTRY STORE INVOICE VERIFICATION ===
+=== $headerTitle INVOICE VERIFICATION ===
 Store Name: $storeName
 Invoice Number: $invoiceNumber
 Invoice Date & Time: $formattedDate
@@ -185,7 +186,7 @@ Status: VERIFIED AUTHENTIC OFFICIAL INVOICE
         settings: StoreSettings,
         storeProfile: StoreProfile? = null,
         customer: Customer? = null,
-        cashierName: String = "Chaudhary Umair Mehdi"
+        cashierName: String? = null
     ): PrintableInvoiceStructure {
         val invoiceId = if (sale.invoiceNumber.isNotBlank()) {
             sale.invoiceNumber
@@ -198,6 +199,13 @@ Status: VERIFIED AUTHENTIC OFFICIAL INVOICE
         }
 
         val formattedDate = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(sale.timestamp))
+
+        val resolvedCashier = when {
+            !cashierName.isNullOrBlank() -> cashierName
+            sale.cashierName.isNotBlank() -> sale.cashierName
+            settings.defaultCashierName.isNotBlank() -> settings.defaultCashierName
+            else -> "Not Assigned"
+        }
 
         val header = StoreHeaderInfo(
             storeId = storeProfile?.id ?: settings.activeStoreId,
@@ -250,7 +258,7 @@ Status: VERIFIED AUTHENTIC OFFICIAL INVOICE
             transactionType = "SALE INVOICE",
             timestamp = sale.timestamp,
             formattedDate = formattedDate,
-            cashierName = cashierName,
+            cashierName = resolvedCashier,
             paymentType = sale.paymentType
         )
 
@@ -514,7 +522,8 @@ Status: VERIFIED AUTHENTIC OFFICIAL INVOICE
                     <div class="meta-grid">
                         <div>
                             <strong>Bill To:</strong> ${invoice.customer.name}<br>
-                            <span style="font-size: 12px; color: #64748b;">Phone: ${invoice.customer.phone.ifBlank { "N/A" }}</span>
+                            <span style="font-size: 12px; color: #64748b;">Phone: ${invoice.customer.phone.ifBlank { "N/A" }}</span><br>
+                            <span style="font-size: 12px; color: #334155;"><strong>Cashier:</strong> ${invoice.meta.cashierName}</span>
                         </div>
                         <div style="text-align: right;">
                             <strong>Date:</strong> ${invoice.meta.formattedDate}<br>

@@ -27,6 +27,13 @@ import com.example.data.entity.TenantAccount
 import com.example.data.entity.SubscriptionPlan
 import com.example.data.entity.RecycleBinItem
 import com.example.data.entity.SuperAdminRecovery
+import com.example.data.api.security.AppActivationManager
+import com.example.data.api.network.NetworkConnectivityMonitor
+import com.example.data.api.network.ConnectionState
+import com.example.data.api.network.DetailedConnectionStatus
+import com.example.data.api.sync.SyncManager
+import com.example.data.api.sync.SyncState
+import com.example.data.api.sync.SyncLogLevel
 import com.example.data.entity.AttendanceRecord
 import com.example.util.RecoveryUtils
 import com.example.util.SecurityUtils
@@ -101,6 +108,14 @@ data class PurchaseCartItem(
 ) {
     val total: Double get() = quantity * costPrice
 }
+
+data class CashierProfile(
+    val name: String = "Not Assigned",
+    val employeeId: String = "",
+    val phone: String = "",
+    val designation: String = "Cashier",
+    val userId: Long? = null
+)
 
 class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -483,6 +498,43 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         _isAttendanceHidden.value = hidden
     }
 
+    private val appActivationManager = AppActivationManager.getInstance(application)
+    val syncManager = SyncManager.getInstance(application)
+    val networkMonitor = NetworkConnectivityMonitor.getInstance(application)
+
+    private val _isAppActivated = MutableStateFlow(appActivationManager.isActivated())
+    val isAppActivated: StateFlow<Boolean> = _isAppActivated.asStateFlow()
+
+    val activationStateFlow: StateFlow<String> = appActivationManager.activationStateFlow
+    val connectionStatus: StateFlow<DetailedConnectionStatus> = networkMonitor.connectionStatus
+    val syncState: StateFlow<SyncState> = syncManager.syncState
+    val isSyncing: StateFlow<Boolean> = syncManager.isSyncing
+    val pendingSyncCount: StateFlow<Int> = syncManager.pendingSyncCount
+
+    fun refreshActivationState() {
+        _isAppActivated.value = appActivationManager.isActivated()
+    }
+
+    fun pingServerNow() {
+        viewModelScope.launch {
+            networkMonitor.pingServer()
+        }
+    }
+
+    fun triggerCloudSync(onComplete: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            val success = syncManager.performManualSync()
+            onComplete?.invoke(success)
+        }
+    }
+
+    fun checkConnectionAndSync() {
+        viewModelScope.launch {
+            networkMonitor.pingServer()
+            syncManager.performManualSync()
+        }
+    }
+
     private val _isOnboardingCompleted = MutableStateFlow(
         prefs.getBoolean("is_onboarding_completed", false)
     )
@@ -606,6 +658,99 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
         .combine(MutableStateFlow(Unit)) { s, _ -> s ?: StoreSettings() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StoreSettings())
 
+    // --- CASHIER / OPERATOR PROFILE STATE ---
+    val activeCashierProfile: StateFlow<CashierProfile> = combine(_currentUser, settings) { user, setts ->
+        when {
+            user != null && user.name.isNotBlank() -> CashierProfile(
+                name = user.name,
+                employeeId = if (user.id > 0) user.id.toString() else "",
+                phone = user.phone,
+                designation = if (user.role == "EMPLOYEE") "Cashier" else if (user.role == "ADMIN") "Store Admin" else user.role,
+                userId = user.id
+            )
+            setts.defaultCashierName.isNotBlank() -> CashierProfile(
+                name = setts.defaultCashierName,
+                employeeId = setts.defaultCashierEmployeeId,
+                phone = setts.defaultCashierPhone,
+                designation = setts.defaultCashierDesignation.ifBlank { "Cashier" },
+                userId = null
+            )
+            else -> CashierProfile(
+                name = "Not Assigned",
+                employeeId = "",
+                phone = "",
+                designation = "Cashier",
+                userId = null
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CashierProfile(name = "Not Assigned"))
+
+    fun getEffectiveCashierName(): String {
+        val user = _currentUser.value
+        if (user != null && user.name.isNotBlank()) return user.name
+        val settCashier = settings.value.defaultCashierName
+        if (settCashier.isNotBlank()) return settCashier
+        return "Not Assigned"
+    }
+
+    fun getEffectiveCashierUserId(): Long? {
+        val user = _currentUser.value
+        if (user != null && user.id > 0) return user.id
+        return null
+    }
+
+    fun updateCashierProfile(
+        name: String,
+        employeeId: String = "",
+        phone: String = "",
+        designation: String = "Cashier",
+        onComplete: ((Boolean, String) -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                val current = repository.getSettingsSync()
+                val updated = current.copy(
+                    defaultCashierName = name.trim(),
+                    defaultCashierEmployeeId = employeeId.trim(),
+                    defaultCashierPhone = phone.trim(),
+                    defaultCashierDesignation = designation.trim().ifBlank { "Cashier" }
+                )
+                repository.saveSettings(updated)
+
+                logActivity(
+                    action = "CASHIER_PROFILE_UPDATE",
+                    details = "Updated default cashier profile to '${name.trim()}' (${designation.trim()})"
+                )
+
+                showToast("Cashier profile saved successfully!")
+                onComplete?.invoke(true, "Cashier profile saved successfully!")
+            } catch (e: Exception) {
+                showToast("Failed to save cashier profile: ${e.localizedMessage}")
+                onComplete?.invoke(false, e.localizedMessage ?: "Unknown error")
+            }
+        }
+    }
+
+    fun setCashierFromEmployee(user: UserAccount, onComplete: ((Boolean, String) -> Unit)? = null) {
+        updateCashierProfile(
+            name = user.name,
+            employeeId = if (user.id > 0) user.id.toString() else "",
+            phone = user.phone,
+            designation = if (user.role == "EMPLOYEE") "Cashier" else if (user.role == "ADMIN") "Store Admin" else user.role,
+            onComplete = onComplete
+        )
+    }
+
+    fun clearCashierProfile(onComplete: ((Boolean, String) -> Unit)? = null) {
+        updateCashierProfile(
+            name = "",
+            employeeId = "",
+            phone = "",
+            designation = "Cashier",
+            onComplete = onComplete
+        )
+    }
+
     // --- PRODUCTS / INVENTORY ---
     val allCategories: StateFlow<List<CategoryEntity>> = repository.allCategories
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -725,6 +870,10 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
             repository.deleteExpense(expense)
             showToast("Expense removed.")
         }
+    }
+
+    suspend fun getSaleItems(saleId: Long): List<SaleItem> {
+        return repository.getSaleItemsSync(saleId)
     }
 
     // --- ANALYTICS & CHARTS DATA ---
@@ -1887,6 +2036,8 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
             val invNum = "INV-" + (System.currentTimeMillis() / 1000).toString().takeLast(6)
             val customer = _selectedCustomer.value
+            val currentCashierName = getEffectiveCashierName()
+            val currentCashierId = getEffectiveCashierUserId()
 
             val activeStoreId = if (_selectedStoreId.value == 0L) 1L else _selectedStoreId.value
             val sale = Sale(
@@ -1900,6 +2051,8 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                 paidAmount = paid,
                 dueAmount = due,
                 paymentType = _paymentType.value,
+                cashierName = currentCashierName,
+                cashierId = currentCashierId,
                 timestamp = System.currentTimeMillis()
             )
 
@@ -1944,6 +2097,8 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
 
             val invNum = "INV-" + (System.currentTimeMillis() / 1000).toString().takeLast(6)
             val customer = _selectedCustomer.value
+            val currentCashierName = getEffectiveCashierName()
+            val currentCashierId = getEffectiveCashierUserId()
 
             val activeStoreId = if (_selectedStoreId.value == 0L) 1L else _selectedStoreId.value
             val sale = Sale(
@@ -1957,6 +2112,8 @@ class StoreViewModel(application: Application) : AndroidViewModel(application) {
                 paidAmount = paid,
                 dueAmount = due,
                 paymentType = customPaymentType,
+                cashierName = currentCashierName,
+                cashierId = currentCashierId,
                 timestamp = System.currentTimeMillis()
             )
 

@@ -17,12 +17,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddShoppingCart
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PersonAdd
@@ -31,11 +33,14 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -46,6 +51,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -65,6 +71,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.api.network.ConnectionState
+import com.example.data.api.sync.SyncState
 import com.example.data.entity.Customer
 import com.example.data.entity.Product
 import com.example.ui.components.BarCodeScannerDialog
@@ -85,6 +93,11 @@ fun SalesPosScreen(viewModel: StoreViewModel) {
     val paidAmountInput by viewModel.paidAmountInput.collectAsState()
     val paymentType by viewModel.paymentType.collectAsState()
     val settings by viewModel.settings.collectAsState()
+    val activeCashier by viewModel.activeCashierProfile.collectAsState()
+
+    val connectionStatus by viewModel.connectionStatus.collectAsState()
+    val pendingSyncCount by viewModel.pendingSyncCount.collectAsState()
+    val isSyncing by viewModel.syncState.collectAsState()
 
     val showInvoiceDialog by viewModel.showInvoiceDialog.collectAsState()
     val lastCompletedSale by viewModel.lastCompletedSale.collectAsState()
@@ -128,6 +141,24 @@ fun SalesPosScreen(viewModel: StoreViewModel) {
                         .weight(1.1f)
                         .fillMaxHeight()
                 ) {
+                    PosOfflineSyncBanner(
+                        connectionState = connectionStatus.state,
+                        latencyMs = connectionStatus.latencyMs,
+                        pendingSyncCount = pendingSyncCount,
+                        isSyncing = isSyncing == SyncState.SYNCING,
+                        onSyncClick = { viewModel.checkConnectionAndSync() }
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    PosActiveCashierBadge(
+                        cashierName = activeCashier.name,
+                        designation = activeCashier.designation,
+                        employeeId = activeCashier.employeeId
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     PosCatalogHeader(
                         searchQuery = searchQuery,
                         onSearchChange = { viewModel.setSearchQuery(it) },
@@ -181,6 +212,24 @@ fun SalesPosScreen(viewModel: StoreViewModel) {
         } else {
             // Mobile Vertical Screen: Dual Tab Switcher
             Column(modifier = Modifier.fillMaxSize()) {
+                PosOfflineSyncBanner(
+                    connectionState = connectionStatus.state,
+                    latencyMs = connectionStatus.latencyMs,
+                    pendingSyncCount = pendingSyncCount,
+                    isSyncing = isSyncing == SyncState.SYNCING,
+                    onSyncClick = { viewModel.checkConnectionAndSync() }
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                PosActiveCashierBadge(
+                    cashierName = activeCashier.name,
+                    designation = activeCashier.designation,
+                    employeeId = activeCashier.employeeId
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
                 TabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.colorScheme.surface
@@ -810,4 +859,191 @@ fun AddCustomerDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+fun PosOfflineSyncBanner(
+    connectionState: ConnectionState,
+    latencyMs: Long,
+    pendingSyncCount: Int,
+    isSyncing: Boolean,
+    onSyncClick: () -> Unit
+) {
+    Surface(
+        color = Color(0xFF0F172A),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(
+            1.dp,
+            when (connectionState) {
+                ConnectionState.ONLINE_CONNECTED -> Color(0xFF10B981).copy(alpha = 0.4f)
+                ConnectionState.ONLINE_UNREACHABLE -> Color(0xFFF59E0B).copy(alpha = 0.4f)
+                ConnectionState.OFFLINE -> Color(0xFF38BDF8).copy(alpha = 0.3f)
+            }
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("pos_offline_sync_banner")
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when (connectionState) {
+                                ConnectionState.ONLINE_CONNECTED -> Color(0xFF10B981)
+                                ConnectionState.ONLINE_UNREACHABLE -> Color(0xFFF59E0B)
+                                ConnectionState.OFFLINE -> Color(0xFFEF4444)
+                            }
+                        )
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = when (connectionState) {
+                                ConnectionState.ONLINE_CONNECTED -> "Server Online"
+                                ConnectionState.ONLINE_UNREACHABLE -> "Server Unreachable"
+                                ConnectionState.OFFLINE -> "Offline Mode"
+                            },
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = when (connectionState) {
+                                ConnectionState.ONLINE_CONNECTED -> Color(0xFF10B981)
+                                ConnectionState.ONLINE_UNREACHABLE -> Color(0xFFF59E0B)
+                                ConnectionState.OFFLINE -> Color(0xFF38BDF8)
+                            }
+                        )
+
+                        Text(
+                            text = " • Local SQLite Master (100% Safe)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.LightGray
+                        )
+                    }
+
+                    Text(
+                        text = if (isSyncing) "Synchronizing changes with developer cloud..."
+                        else if (pendingSyncCount > 0) "$pendingSyncCount offline change(s) queued for sync"
+                        else if (connectionState == ConnectionState.ONLINE_CONNECTED) "Cloud sync active & standby (${if (latencyMs > 0) "${latencyMs}ms" else "OK"})"
+                        else "All POS sales, scans, and invoices saved locally",
+                        fontSize = 10.sp,
+                        color = if (pendingSyncCount > 0) Color(0xFFFFD700) else Color.Gray
+                    )
+                }
+            }
+
+            if (isSyncing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = Color(0xFF38BDF8),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Surface(
+                    onClick = onSyncClick,
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.White.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = "Sync",
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (pendingSyncCount > 0) "Sync ($pendingSyncCount)" else "Check",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PosActiveCashierBadge(
+    cashierName: String,
+    designation: String,
+    employeeId: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("pos_active_cashier_badge")
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f, fill = false)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Badge,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Cashier: ",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = cashierName.ifBlank { "Not Assigned" },
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (cashierName.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Gray
+                )
+                if (designation.isNotBlank() && cashierName.isNotBlank()) {
+                    Text(
+                        text = " • $designation",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            if (employeeId.isNotBlank()) {
+                Text(
+                    text = "ID: $employeeId",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }

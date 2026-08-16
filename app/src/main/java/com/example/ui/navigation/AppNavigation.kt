@@ -114,8 +114,17 @@ import com.example.ui.screens.SalesPosScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SupplierScreen
 import com.example.ui.screens.DeveloperPanelScreen
+import com.example.ui.screens.StoreManagementCenterScreen
+import com.example.data.api.network.ConnectionState
+import com.example.data.api.network.DetailedConnectionStatus
+import com.example.data.api.security.AppActivationManager
+import com.example.data.api.sync.SyncState
 import androidx.compose.material.icons.filled.DeveloperMode
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudQueue
 import com.example.ui.theme.BentoCardSlate
 import com.example.ui.theme.BentoPrimary
 import com.example.ui.components.ShopLogoAvatar
@@ -180,6 +189,9 @@ data class DrawerMenuItem(
 fun AppNavigation(viewModel: StoreViewModel) {
     val isAuthenticated by viewModel.isAuthenticated.collectAsState()
     val isOnboardingCompleted by viewModel.isOnboardingCompleted.collectAsState()
+    val isAppActivated by viewModel.isAppActivated.collectAsState()
+    val activationState by viewModel.activationStateFlow.collectAsState()
+    val connectionStatus by viewModel.connectionStatus.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
@@ -203,6 +215,7 @@ fun AppNavigation(viewModel: StoreViewModel) {
     var showAboutDialog by remember { mutableStateOf(false) }
     var showHelpSupportDialog by remember { mutableStateOf(false) }
     var showDeveloperAuthDialog by remember { mutableStateOf(false) }
+    var showDeveloperScreenFromActivation by remember { mutableStateOf(false) }
     var devPinInput by remember { mutableStateOf("") }
     var devPinError by remember { mutableStateOf<String?>(null) }
 
@@ -213,7 +226,25 @@ fun AppNavigation(viewModel: StoreViewModel) {
         }
     }
 
-    if (!isOnboardingCompleted) {
+    if (showDeveloperScreenFromActivation) {
+        DeveloperPanelScreen(
+            viewModel = viewModel,
+            onNavigateBack = {
+                showDeveloperScreenFromActivation = false
+                viewModel.refreshActivationState()
+            }
+        )
+    } else if (!isAppActivated) {
+        CustomerActivationScreen(
+            viewModel = viewModel,
+            onActivated = {
+                viewModel.refreshActivationState()
+            },
+            onOpenDeveloperPortal = {
+                showDeveloperScreenFromActivation = true
+            }
+        )
+    } else if (!isOnboardingCompleted) {
         BusinessSetupWizardScreen(
             viewModel = viewModel,
             onSetupCompleted = {}
@@ -223,6 +254,9 @@ fun AppNavigation(viewModel: StoreViewModel) {
     } else {
         val currentUser by viewModel.currentUser.collectAsState()
         val userAllowedStores by viewModel.userAllowedStores.collectAsState()
+        val connectionStatus by viewModel.connectionStatus.collectAsState()
+        val pendingSyncCount by viewModel.pendingSyncCount.collectAsState()
+        val isSyncing by viewModel.syncState.collectAsState()
 
         val isEmp = currentUser?.role == "EMPLOYEE"
         val isSuperAdmin = currentUser?.role == "SUPER_ADMIN"
@@ -242,11 +276,12 @@ fun AppNavigation(viewModel: StoreViewModel) {
         val drawerItems = remember(isSuperAdmin) {
             val items = mutableListOf(
                 DrawerMenuItem("Dashboard", Icons.Default.Home, Screen.Dashboard.route),
+                DrawerMenuItem("Store Center", Icons.Default.Storefront, Screen.StoreManagement.route),
                 DrawerMenuItem("POS Sale", Icons.Default.PointOfSale, Screen.SalesPos.route),
                 DrawerMenuItem("Products", Icons.Default.Inventory2, Screen.Inventory.route),
                 DrawerMenuItem("Purchase", Icons.Default.ShoppingBag, Screen.Purchase.route),
                 DrawerMenuItem("Customers", Icons.Default.People, Screen.Customers.route),
-                DrawerMenuItem("Suppliers", Icons.Default.Storefront, Screen.Suppliers.route),
+                DrawerMenuItem("Suppliers", Icons.Default.Business, Screen.Suppliers.route),
                 DrawerMenuItem("Attendance & Payroll", Icons.Default.Schedule, Screen.Attendance.route),
                 DrawerMenuItem("Daily Closing", Icons.Default.Payments, Screen.DailyClosing.route),
                 DrawerMenuItem("Reports", Icons.Default.Assessment, Screen.Reports.route),
@@ -666,6 +701,84 @@ fun AppNavigation(viewModel: StoreViewModel) {
                                 }
                             }
 
+                            // Live Connection & Sync Status Chip (🟢 / 🟡 / 🔴)
+                            Surface(
+                                onClick = {
+                                    viewModel.checkConnectionAndSync()
+                                    Toast.makeText(
+                                        context,
+                                        when (connectionStatus.state) {
+                                            ConnectionState.ONLINE_CONNECTED -> "🟢 Server Online (${connectionStatus.latencyMs}ms) • Local SQLite Master Active"
+                                            ConnectionState.ONLINE_UNREACHABLE -> "🟡 Server Unreachable • Operating in 100% Offline POS Mode ($pendingSyncCount queued)"
+                                            ConnectionState.OFFLINE -> "🔴 Offline Mode (No Internet) • Local Sales & Data 100% Safe ($pendingSyncCount queued)"
+                                        },
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                                color = when (connectionStatus.state) {
+                                    ConnectionState.ONLINE_CONNECTED -> Color(0xFF064E3B)
+                                    ConnectionState.ONLINE_UNREACHABLE -> Color(0xFF78350F)
+                                    ConnectionState.OFFLINE -> Color(0xFF450A0A)
+                                },
+                                border = BorderStroke(
+                                    1.dp,
+                                    when (connectionStatus.state) {
+                                        ConnectionState.ONLINE_CONNECTED -> Color(0xFF10B981)
+                                        ConnectionState.ONLINE_UNREACHABLE -> Color(0xFFF59E0B)
+                                        ConnectionState.OFFLINE -> Color(0xFFEF4444)
+                                    }.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                when (connectionStatus.state) {
+                                                    ConnectionState.ONLINE_CONNECTED -> Color(0xFF10B981)
+                                                    ConnectionState.ONLINE_UNREACHABLE -> Color(0xFFF59E0B)
+                                                    ConnectionState.OFFLINE -> Color(0xFFEF4444)
+                                                }
+                                            )
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = if (isSyncing == SyncState.SYNCING) "Syncing..."
+                                        else when (connectionStatus.state) {
+                                            ConnectionState.ONLINE_CONNECTED -> "Online"
+                                            ConnectionState.ONLINE_UNREACHABLE -> "Offline (Safe)"
+                                            ConnectionState.OFFLINE -> "Offline"
+                                        },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                    if (pendingSyncCount > 0) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = Color(0xFFFFD700),
+                                            modifier = Modifier.size(14.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = "$pendingSyncCount",
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = Color.Black
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             // Profile Button
                             IconButton(onClick = { showProfileDialog = true }) {
                                 Icon(
@@ -777,6 +890,19 @@ fun AppNavigation(viewModel: StoreViewModel) {
                 ) {
                     composable(Screen.Dashboard.route) {
                         DashboardScreen(
+                            viewModel = viewModel,
+                            onNavigate = { route ->
+                                if (navController.currentDestination?.route != route) {
+                                    navController.navigate(route) {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            }
+                        )
+                    }
+
+                    composable(Screen.StoreManagement.route) {
+                        StoreManagementCenterScreen(
                             viewModel = viewModel,
                             onNavigate = { route ->
                                 if (navController.currentDestination?.route != route) {
@@ -935,16 +1061,52 @@ fun AppNavigation(viewModel: StoreViewModel) {
     }
 
     if (showAppInfoDialog) {
+        val connDisplay = when (connectionStatus.state) {
+            ConnectionState.ONLINE_CONNECTED -> "ONLINE • SERVER CONNECTED"
+            ConnectionState.ONLINE_UNREACHABLE -> "ONLINE • SERVER UNREACHABLE"
+            ConnectionState.OFFLINE -> "OFFLINE • NO INTERNET"
+        }
+        val devApiDisplay = if (connectionStatus.isServerReachable) "CONNECTED" else "UNREACHABLE"
+        val activationDisplay = when (activationState) {
+            AppActivationManager.STATUS_ACTIVATED -> "ACTIVE"
+            AppActivationManager.STATUS_SUSPENDED -> "SUSPENDED"
+            AppActivationManager.STATUS_REVOKED -> "REVOKED"
+            else -> "NOT ACTIVATED"
+        }
+
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showAppInfoDialog = false },
             title = { Text("App Information", fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Application: Commercial POS & Store Management")
-                    Text("Version: 2.5.0 (Offline Production Build)")
-                    Text("Database Engine: SQLite Local Database")
-                    Text("Optimization: R8 Obfuscation & Minification")
-                    Text("Status: 100% Offline Functional")
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column {
+                        Text("Application:", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text("CH UMER POS", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    }
+                    Column {
+                        Text("Architecture:", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text("Offline-First POS • Online Developer & Sync", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    }
+                    Column {
+                        Text("Database:", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text("Room / SQLite Local Database", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Column {
+                        Text("Activation:", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text(activationDisplay, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = if (activationDisplay == "ACTIVE") Color(0xFF10B981) else Color(0xFFEF4444))
+                    }
+                    Column {
+                        Text("Connection:", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text(connDisplay, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = when (connectionStatus.state) {
+                            ConnectionState.ONLINE_CONNECTED -> Color(0xFF10B981)
+                            ConnectionState.ONLINE_UNREACHABLE -> Color(0xFFF59E0B)
+                            ConnectionState.OFFLINE -> Color(0xFFEF4444)
+                        })
+                    }
+                    Column {
+                        Text("Developer API:", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text(devApiDisplay, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = if (connectionStatus.isServerReachable) Color(0xFF10B981) else Color(0xFFF59E0B))
+                    }
                 }
             },
             confirmButton = {

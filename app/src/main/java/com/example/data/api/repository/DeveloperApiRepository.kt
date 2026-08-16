@@ -5,12 +5,16 @@ import com.example.data.api.license.LicenseStateCache
 import com.example.data.api.model.ApiResult
 import com.example.data.api.model.AppVersionCheckRequest
 import com.example.data.api.model.AppVersionCheckResponse
+import com.example.data.api.model.HealthCheckResponse
+import com.example.data.api.model.InstallationActivateRequest
+import com.example.data.api.model.InstallationActivateResponse
 import com.example.data.api.model.LicenseHeartbeatRequest
 import com.example.data.api.model.LicenseHeartbeatResponse
 import com.example.data.api.model.LicenseValidateRequest
 import com.example.data.api.model.LicenseValidateResponse
 import com.example.data.api.model.RegisterInstallationRequest
 import com.example.data.api.model.RegisterInstallationResponse
+import com.example.data.api.model.ServerConfigResponse
 import com.example.data.api.network.ApiClient
 import com.example.data.api.network.OfflineNetworkException
 import com.example.data.api.security.SecureIdentityManager
@@ -31,7 +35,29 @@ class DeveloperApiRepository(context: Context) {
     private val licenseStateCache = LicenseStateCache.getInstance(context)
 
     /**
-     * Registers app installation with the future Developer Server.
+     * Checks developer server health (GET /health).
+     */
+    suspend fun checkHealth(): ApiResult<HealthCheckResponse> {
+        return withContext(Dispatchers.IO) {
+            safeApiCall {
+                apiClient.apiService.checkHealth()
+            }
+        }
+    }
+
+    /**
+     * Retrieves server configuration (GET /config).
+     */
+    suspend fun getServerConfig(): ApiResult<ServerConfigResponse> {
+        return withContext(Dispatchers.IO) {
+            safeApiCall {
+                apiClient.apiService.getServerConfig()
+            }
+        }
+    }
+
+    /**
+     * Registers app installation with the Developer Server (POST /installation/register).
      */
     suspend fun registerInstallation(): ApiResult<RegisterInstallationResponse> {
         return withContext(Dispatchers.IO) {
@@ -42,8 +68,7 @@ class DeveloperApiRepository(context: Context) {
                     storeId = identityManager.getStoreId(),
                     appVersion = identityManager.getAppVersion()
                 )
-                val res = apiClient.apiService.registerInstallation(req)
-                res
+                apiClient.apiService.registerInstallation(req)
             }.also { result ->
                 if (result is ApiResult.Success) {
                     val data = result.data
@@ -60,7 +85,47 @@ class DeveloperApiRepository(context: Context) {
     }
 
     /**
-     * Validates commercial license key with the Developer Server.
+     * Activates app installation using Activation Code with the Developer Server (POST /installation/activate).
+     */
+    suspend fun activateInstallation(activationCode: String): ApiResult<InstallationActivateResponse> {
+        return withContext(Dispatchers.IO) {
+            safeApiCall {
+                val req = InstallationActivateRequest(
+                    installationId = identityManager.getInstallationId(),
+                    activationCode = activationCode.trim(),
+                    customerId = identityManager.getCustomerId(),
+                    storeId = identityManager.getStoreId(),
+                    appVersion = identityManager.getAppVersion()
+                )
+                apiClient.apiService.activateInstallation(req)
+            }.also { result ->
+                if (result is ApiResult.Success) {
+                    val data = result.data
+                    if (data.status.equals("ACTIVE", ignoreCase = true) || data.status.equals("ACTIVATED", ignoreCase = true)) {
+                        licenseStateCache.updateCachedLicenseState(
+                            status = LicenseStateCache.STATUS_ACTIVE,
+                            message = data.message,
+                            planType = data.planType ?: "COMMERCIAL",
+                            maxShops = data.maxShops ?: 10,
+                            maxUsers = data.maxUsers ?: 25
+                        )
+                        if (!data.activationToken.isNullOrEmpty()) {
+                            tokenManager.saveTokens(
+                                accessToken = data.activationToken ?: "",
+                                refreshToken = "",
+                                expiresInSeconds = 31536000L
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun String?.isNull_or_empty(): Boolean = this == null || this.isEmpty()
+
+    /**
+     * Validates commercial license key with the Developer Server (POST /license/validate).
      */
     suspend fun validateLicense(licenseKey: String): ApiResult<LicenseValidateResponse> {
         return withContext(Dispatchers.IO) {
@@ -88,7 +153,7 @@ class DeveloperApiRepository(context: Context) {
     }
 
     /**
-     * Sends periodic license heartbeat to the Developer Server.
+     * Sends periodic license heartbeat to the Developer Server (POST /license/heartbeat).
      */
     suspend fun sendHeartbeat(): ApiResult<LicenseHeartbeatResponse> {
         return withContext(Dispatchers.IO) {
@@ -112,7 +177,7 @@ class DeveloperApiRepository(context: Context) {
     }
 
     /**
-     * Checks for app version updates from Developer Server.
+     * Checks for app version updates from Developer Server (POST /app/version).
      */
     suspend fun checkAppVersion(): ApiResult<AppVersionCheckResponse> {
         return withContext(Dispatchers.IO) {
@@ -142,7 +207,7 @@ class DeveloperApiRepository(context: Context) {
             } else {
                 ApiResult.Error(
                     code = response.code(),
-                    message = response.errorBody()?.string() ?: "Server returned error code ${response.code()}"
+                    message = response.errorBody()?.string() ?: "Server returned HTTP ${response.code()}"
                 )
             }
         } catch (e: OfflineNetworkException) {
