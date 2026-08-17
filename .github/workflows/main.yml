@@ -20,11 +20,15 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Validate Gradle Wrapper
+        uses: gradle/wrapper-validation-action@v3
+        continue-on-error: true
+
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-executable-attribute-fix-enabled: true
-          wrapper-validation-enabled: false
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Clean Project
         run: ./gradlew clean --no-daemon
