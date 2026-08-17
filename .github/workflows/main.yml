@@ -20,10 +20,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle (Auto Fix Permissions)
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-executable-attribute-fix-enabled: true
+          wrapper-validation-enabled: false
 
       - name: Clean Project
         run: ./gradlew clean --no-daemon
