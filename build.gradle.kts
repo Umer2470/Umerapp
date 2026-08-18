@@ -7,3 +7,11 @@ plugins {
   alias(libs.plugins.roborazzi) apply false
   alias(libs.plugins.secrets) apply false
 }
+android {
+    // آپ کا باقی تمام کوڈ ویسے ہی رہے گا ...
+
+    kotlinOptions {
+        jvmTarget = "17"
+        languageVersion = "2.0"
+    }
+}
