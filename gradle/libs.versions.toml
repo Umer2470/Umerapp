@@ -8,11 +8,9 @@ lifecycleRuntimeKtx = "2.8.7"
 lifecycleViewmodelCompose = "2.8.7"
 lifecycleRuntimeCompose = "2.8.7"
 activityCompose = "1.10.0"
-# Kotlin pinned to 2.0.x for compilerOptions compatibility
-kotlin = "2.0.10"
+kotlin = "2.1.10"
 composeBom = "2025.02.00"
-# Align KSP with Kotlin 2.0.x
-googleDevtoolsKsp = "2.0.10-1.0.30"
+googleDevtoolsKsp = "2.1.10-1.0.30"
 navigationCompose = "2.8.7"
 roomRuntime = "2.7.0-alpha13"
 roomKtx = "2.7.0-alpha13"
